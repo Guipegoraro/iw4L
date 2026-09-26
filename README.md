@@ -80,8 +80,9 @@ Changes on top of upstream, newest last. Every change is recorded here.
   before gamepad support get these binds once on load.
 - **`thirdperson [on|off]`** (also in the mod menu's Skate and Visuals pages,
   saved with the settings) moves the camera behind the player with the
-  retail third-person camera. Work in progress: the player's own body is not
-  drawn yet.
+  retail third-person camera, your own body drawn. Like retail, the camera
+  stops at walls and the map's invisible edges, so with one right behind you
+  it sits close and your body can drop below the frame.
 - **Mod guide.** The pause menu (Esc) has a **Mod Guide** entry: how to use
   every addition, one page per topic. A feature adds its own page with
   `app.add_mod_guide_topic(..)` (`crates/ui/src/mod_guide.rs`).
