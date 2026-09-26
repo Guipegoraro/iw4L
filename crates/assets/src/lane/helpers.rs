@@ -333,26 +333,35 @@ impl MapXModelCatalog {
         stream: &fastfile_t5::ZoneStream<'_>,
         geometry: fastfile_t5::ClipMapGeometry,
         clip: &mut crate::ClipCollision,
-    ) -> Result<(), crate::ClipCollisionError> {
+    ) -> Result<usize, crate::ClipCollisionError> {
         use crate::ClipCollisionError::{MissingTables, Truncated};
         let Some(rows) = geometry.static_models else {
             return if geometry.static_model_count == 0 {
-                Ok(())
+                Ok(0)
             } else {
                 Err(MissingTables)
             };
         };
+        // Rows whose model this zone does not hold (single-player zones
+        // share models through companion zones) are skipped and counted.
+        let mut skipped = 0;
         for index in 0..geometry.static_model_count {
             let row = rows.at(index * fastfile_t5::size::C_STATIC_MODEL);
             let slot = row.at(fastfile_t5::size::C_STATIC_MODEL_XMODEL_OFF);
-            let name = self
+            let skel = self
                 .name_at_slot(Ptr {
                     block: slot.block,
                     offset: slot.offset,
                 })
-                .ok_or(MissingTables)?;
-            let Some(MapXModelSceneAsset::T5(skel)) = self.scene_assets.get_name(name) else {
-                return Err(MissingTables);
+                .and_then(|name| match self.scene_assets.get_name(name) {
+                    Some(MapXModelSceneAsset::T5(skel)) if skel.contents.is_some() => {
+                        Some((name, skel))
+                    }
+                    _ => None,
+                });
+            let Some((name, skel)) = skel else {
+                skipped += 1;
+                continue;
             };
             let read = |offset| stream.f32_at(row, offset).map_err(|_| Truncated);
             let origin = [read(8)?, read(12)?, read(16)?];
@@ -408,7 +417,7 @@ impl MapXModelCatalog {
                 },
             });
         }
-        Ok(())
+        Ok(skipped)
     }
 
     pub(crate) fn phys_preset_slot_n(&self) -> usize {

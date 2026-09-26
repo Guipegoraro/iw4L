@@ -426,7 +426,17 @@ pub fn script_model_placements(s: &ZoneStream<'_>) -> Vec<ScriptModelPlacement> 
 
 pub fn intermission_view_t5(s: &fastfile_t5::ZoneStream<'_>) -> Option<IntermissionView> {
     let text = entity_string_t5(s)?;
-    parse_intermission_view(text)
+    // Zombie maps have no intermission camera; the player start stands in.
+    parse_intermission_view(text).or_else(|| {
+        parse_entities(text)
+            .find(|e| e.classname.as_deref() == Some("info_player_start"))
+            .and_then(|e| {
+                Some(IntermissionView {
+                    origin: e.origin?,
+                    angles: e.angles.unwrap_or([0.0; 3]),
+                })
+            })
+    })
 }
 
 pub fn dm_spawn_points_t5(s: &fastfile_t5::ZoneStream<'_>) -> Vec<SpawnPoint> {
@@ -444,7 +454,40 @@ pub fn dm_spawn_points_t5(s: &fastfile_t5::ZoneStream<'_>) -> Vec<SpawnPoint> {
             spawn.classname = format!("mp_dd_{suffix}");
         }
     }
+    if spawns.is_empty() {
+        spawns = zombie_spawn_points(text);
+    }
     spawns
+}
+
+/// Single-player and zombie maps have no `mp_*` spawns. `_zombiemode` puts
+/// players on the `initial_spawn_points` structs; `info_player_start` is the
+/// engine's own start. They stand in as FFA start and respawn points.
+fn zombie_spawn_points(text: &str) -> Vec<SpawnPoint> {
+    let starts: Vec<_> = parse_entities(text)
+        .filter(|e| e.targetname.as_deref() == Some("initial_spawn_points"))
+        .filter_map(|e| Some((e.origin?, e.angles)))
+        .collect();
+    let starts = if starts.is_empty() {
+        parse_entities(text)
+            .filter(|e| e.classname.as_deref() == Some("info_player_start"))
+            .filter_map(|e| Some((e.origin?, e.angles)))
+            .collect()
+    } else {
+        starts
+    };
+    starts
+        .into_iter()
+        .flat_map(|(origin, angles)| {
+            ["mp_dm_spawn_start", "mp_dm_spawn"].map(|classname| SpawnPoint {
+                classname: classname.to_owned(),
+                origin,
+                angles: angles.unwrap_or([0.0; 3]),
+                script_linkto: String::new(),
+                script_destructable_area: String::new(),
+            })
+        })
+        .collect()
 }
 
 pub fn script_model_placements_t5(s: &fastfile_t5::ZoneStream<'_>) -> Vec<ScriptModelPlacement> {

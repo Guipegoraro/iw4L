@@ -112,15 +112,19 @@ Changes on top of upstream, newest last. Every change is recorded here.
   install inside the MW2 folder (`IW4L_GAMES`): shortcut targets are extra
   search roots. Then `map t5:mp_nuked` (any `t5:mp_*` map) loads a BO1
   multiplayer map and `give t5:famas`, `give t5:commando`, … hand out BO1
-  guns, also on MW2 maps. The zombie maps (`zombie_*`) do not load yet: they
-  are single-player zones with other asset layouts (their clipmap has no
-  brush table in IW4L's reader) and their gameplay is GSC script, which IW4L
-  does not run.
+  guns, also on MW2 maps. Zombie maps load as a walkable level:
+  `map t5:zombie_theater` (Kino der Toten) puts you on the map's
+  `initial_spawn_points` (or `info_player_start`) in a free-for-all. There
+  are no zombies yet (the zombies rules are being ported to Rust), and
+  surfaces whose materials live in the zombie companion zones show as a
+  checkerboard. Static models whose model is not in the map's own zone are
+  left out of collision and counted in the load report.
 - **Export a zone's raw files.** `iw4l export-rawfiles t5:<zone>` writes every
   raw file of a Black Ops zone (GSC/CSC scripts, aitype and character scripts,
   configs) to `iw4l-artifacts/rawfiles/<zone>/`, unpacking the compressed
   scripts to plain text. It is how the zombie scripts are read for porting,
-  and works the same on a custom map's or mod's zone. The output is your own
+  and works the same on a custom map's or mod's zone. A map zone also gives
+  `mapents.txt`, its entity string (spawners, zones, doors, path nodes). The output is your own
   game data; keep it out of the repository.
 - **Windows test runs.** `cargo run -p approved_tests -- heavy_gameplay_lifecycle`
   works on Windows (junction for the shared cache, `iw4l.exe`, newest log when

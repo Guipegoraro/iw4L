@@ -35,6 +35,20 @@ pub fn export_t5_rawfiles(zone: &Path, out_dir: &Path) -> Result<RawFileExport, 
     };
     fastfile_t5::load_zone(&mut stream, &mut sink)
         .map_err(|e| format!("{}: walk stopped: {e:?}", zone.display()))?;
+    // A map zone's entity string (spawners, zones, doors, structs), as
+    // `mapents.txt`: the map's half of what its scripts look up.
+    let entities = stream.map_ents().and_then(|ents| {
+        let text = ents.entity_string?;
+        stream.slice_at(text, 0, ents.entity_chars).ok()
+    });
+    if let Some(text) = entities {
+        let text = text.strip_suffix(&[0]).unwrap_or(text);
+        std::fs::create_dir_all(out_dir)
+            .and_then(|()| std::fs::write(out_dir.join("mapents.txt"), text))
+            .map_err(|e| format!("{}: {e}", out_dir.display()))?;
+        sink.export.files += 1;
+        sink.export.bytes += text.len();
+    }
     match sink.error {
         Some(error) => Err(error),
         None => Ok(sink.export),
