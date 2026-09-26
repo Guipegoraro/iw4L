@@ -104,6 +104,20 @@ pub(crate) fn register_debug_move_commands(registry: &mut ConsoleRegistry) {
             registry.register(crate::CommandSpec::new(name).usage(usage));
         }
     }
+    for (name, usage) in [
+        (
+            "savepos",
+            "savepos [slot] — remember where you stand and look (slot 0 by default)",
+        ),
+        (
+            "loadpos",
+            "loadpos [slot] — teleport back to a saved position (needs cheats)",
+        ),
+    ] {
+        if registry.resolve(name).is_none() {
+            registry.register(crate::CommandSpec::new(name).usage(usage));
+        }
+    }
     if registry.resolve("timescale").is_none() {
         registry.register(
             crate::CommandSpec::new("timescale").usage(

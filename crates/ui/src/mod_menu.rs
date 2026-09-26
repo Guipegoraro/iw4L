@@ -506,6 +506,8 @@ fn default_pages() -> Vec<ModMenuPage> {
             .command("Kill yourself", "kill")
             .command("Heal", "heal")
             .command("God mode on / off", "god")
+            .command("Save position", "savepos")
+            .command_and_close("Load position", "loadpos")
             .command_and_close("Noclip on / off", "noclip")
             .command("Take 40 damage", "damage 40")
             .command("Show position", "showpos on")

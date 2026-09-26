@@ -298,6 +298,7 @@ impl Plugin for ConsolePlugin {
             .init_resource::<crate::ConsoleLine>()
             .init_resource::<crate::weapon_dispatch::WeaponArgCompletions>()
             .init_resource::<crate::user_settings::PendingMenuBinding>()
+            .init_resource::<crate::savepos::SavedPositions>()
             .init_resource::<crate::user_settings::UserSettingsPersistence>()
             .add_message::<ConsoleCommand>()
             .add_systems(Update, apply_ingame_menu_intents.after(ClientSet::Ui))
@@ -307,6 +308,7 @@ impl Plugin for ConsolePlugin {
                     crate::user_settings::route_view_commands,
                     crate::user_settings::sync_third_person_view,
                     crate::timescale::route_timescale_commands,
+                    crate::savepos::route_savepos_commands,
                 )
                     .chain(),
             )

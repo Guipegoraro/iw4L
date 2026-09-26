@@ -49,6 +49,8 @@ Changes on top of upstream, newest last. Every change is recorded here.
   match's gravity (default 800) and move speed (190) for every player, live
   and for later spawns (`crates/sim/src/tuning.rs`). Mod menu: World page,
   with presets.
+- **`savepos [slot]` / `loadpos [slot]`** remember where you stand and look
+  and teleport back (through `move`), for retrying a line (mod menu: Player).
 - **`noclip [on|off]`** flies through walls along the view: jump rises,
   crouch sinks, sprint doubles the speed (mod menu: Player). It is a movement
   mode like skate (`crates/movement_iw4/src/noclip.rs`).
