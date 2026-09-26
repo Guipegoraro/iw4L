@@ -73,6 +73,11 @@ pub enum ClientAction {
         amount: i32,
     },
 
+    /// Restore an Alive player's health to `max_health`.
+    DebugHeal {
+        request_id: ActionRequestId,
+    },
+
     SetName {
         request_id: ActionRequestId,
         name: [u8; 16],
@@ -126,6 +131,7 @@ pub fn action_request_id(action: &ClientAction) -> ActionRequestId {
         | ClientAction::Move { request_id, .. }
         | ClientAction::BeginScriptMoverRotateVelocity { request_id, .. }
         | ClientAction::DebugDamage { request_id, .. }
+        | ClientAction::DebugHeal { request_id }
         | ClientAction::SetName { request_id, .. }
         | ClientAction::UseCopycat { request_id } => request_id,
     }

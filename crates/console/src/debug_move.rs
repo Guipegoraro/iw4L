@@ -71,6 +71,12 @@ pub(crate) fn register_debug_move_commands(registry: &mut ConsoleRegistry) {
             ),
         );
     }
+    if registry.resolve("heal").is_none() {
+        registry.register(
+            crate::CommandSpec::new("heal")
+                .usage("heal — restore Alive health to max (needs cheats; invented)"),
+        );
+    }
     if registry.resolve("look").is_none() {
         registry.register(
             crate::CommandSpec::new("look")
@@ -386,6 +392,38 @@ pub(crate) fn route_debug_move_commands(
                 }
                 echo(
                     format!("damage: queued {amount} request_id={request_id}"),
+                    &mut console,
+                    &mut line,
+                );
+            }
+            "heal" => {
+                if !alive(&presented, local.0) {
+                    echo(
+                        "heal: not Alive — spawn a class first".into(),
+                        &mut console,
+                        &mut line,
+                    );
+                    continue;
+                }
+                if authority.as_ref().is_some_and(|a| !a.0.cheats_enabled()) {
+                    echo("heal: cheats are off".into(), &mut console, &mut line);
+                    continue;
+                }
+                let Some(inbox) = inbox.as_deref_mut() else {
+                    echo(
+                        "heal: no action inbox (not a listen host)".into(),
+                        &mut console,
+                        &mut line,
+                    );
+                    continue;
+                };
+                let request_id = seq.allocate();
+                if let Err(error) = inbox.push(local.0, ClientAction::DebugHeal { request_id }) {
+                    echo(format!("heal: {error}"), &mut console, &mut line);
+                    continue;
+                }
+                echo(
+                    format!("heal: queued request_id={request_id}"),
                     &mut console,
                     &mut line,
                 );

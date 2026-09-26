@@ -1254,6 +1254,7 @@ fn apply_actions(world: &mut FrameWorld, tick: Tick, actions: &[(ClientId, Clien
             } => {
                 apply_debug_damage(world, tick, *id, amount);
             }
+            ClientAction::DebugHeal { request_id: _ } => apply_debug_heal(world, *id),
         }
     }
 }
@@ -1390,6 +1391,19 @@ fn restamp_debug_move_look(world: &mut FrameWorld, actions: &[(ClientId, ClientA
         };
         ps.viewangles = angles;
         ps.delta_angles = packed_look_delta(angles);
+    }
+}
+
+fn apply_debug_heal(world: &mut FrameWorld, id: ClientId) {
+    if !world.bootstrap_ref().allow_debug_actions
+        || !world
+            .client_meta(id)
+            .is_some_and(|m| m.lifecycle == ClientLifecycle::Alive)
+    {
+        return;
+    }
+    if let Some(ps) = world.player_mut(id) {
+        ps.health = ps.max_health;
     }
 }
 
