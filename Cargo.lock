@@ -204,7 +204,10 @@ name = "approved_tests"
 version = "0.1.0"
 dependencies = [
  "asset_transport",
+ "movement_iw4",
+ "playerstate_iw4",
  "serde_json",
+ "trace_iw4",
 ]
 
 [[package]]

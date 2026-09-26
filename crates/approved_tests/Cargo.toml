@@ -10,5 +10,10 @@ description = "The owner-approved end-to-end scenarios, run against a real iw4l 
 asset_transport.workspace = true
 serde_json.workspace = true
 
+[dev-dependencies]
+movement_iw4.workspace = true
+playerstate_iw4.workspace = true
+trace_iw4.workspace = true
+
 [lints]
 workspace = true

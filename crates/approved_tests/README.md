@@ -19,6 +19,22 @@ workspace.
 | --- | --- |
 | `heavy_gameplay_lifecycle` | cold load `mp_overgrown` with 16 players, three input scenes, production disconnect, a watched menu, a second map with three scenes, production quit |
 
+## Approved unit tests
+
+Skate physics, stepped through `movement_iw4::pm_skate_tick` exactly as
+`pm_move` runs it, on analytic ground (planes for floors, slopes and walls) in
+`src/skate_physics.rs`. `cargo test -p approved_tests` runs them; no game data
+needed.
+
+| name | what it checks |
+| --- | --- |
+| `skate_flat_coast` | pushing tops out at the push speed, coasting only slows, 2 s keeps 70%, braking stops |
+| `skate_slope_gain` | downhill gain matches g·sin(slope) minus resistance; uphill slows and rolls back |
+| `skate_carve_radius` | carve radius follows min + k·speed within 15%, wider when faster, right turns right |
+| `skate_ollie_height` | a tap and a full wind-up reach their heights within 3 units; straight landings keep speed |
+| `skate_bail` | a sideways landing bails, pushing does nothing while bailed, control returns; a wall bails |
+| `skate_deterministic` | the same inputs give a bit-identical player state |
+
 The scenario's steps are in `src/scenarios/heavy_gameplay_lifecycle.rs` and
 nowhere else: maps, seed rule, scenes, positions, angles, weapons, durations
 and input. To pin a scene to an owner-chosen position, replace its `Place`

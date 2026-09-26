@@ -45,7 +45,8 @@ Changes on top of upstream, newest last. Every change is recorded here.
   across the board, a hard impact or a wall bails. The view stays free.
   `showpos on` shows ground speed and the board state. Movement modes are a
   hook in `pm_move` (`crates/movement_iw4/src/mode.rs`); skate lives in
-  `skate.rs` with its knobs in `SkateTuning`.
+  `skate.rs` with its knobs in `SkateTuning`. Its physics tests:
+  `cargo test -p approved_tests` (`crates/approved_tests/src/skate_physics.rs`).
 - **Gamepad.** XInput pads (an 8BitDo in XInput mode shows up as an Xbox 360
   controller). Left stick moves (analog: carve depth when skating), right
   stick looks. Buttons are ordinary binds (`bind BUTTON_A +gostand`), console

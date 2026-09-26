@@ -1,5 +1,7 @@
 //! The owner-approved end-to-end scenarios; see README.md.
 
+#[cfg(test)]
+mod skate_physics;
 mod report;
 mod runner;
 mod scenario;
