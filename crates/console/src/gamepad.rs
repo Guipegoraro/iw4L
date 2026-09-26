@@ -122,6 +122,9 @@ const FLICK_HZ: f32 = 60.0;
 /// remains, so a stale trick never replays after a respawn.
 const TRICK_HOLD_SECS: f32 = 0.3;
 const FLICK_DEADZONE: f32 = 0.1;
+/// How fast the view swings round to the board while skating with a pad,
+/// as a fraction of the gap per second.
+const FOLLOW_BOARD_RATE: f32 = 4.0;
 
 /// Flick-it state: the recogniser (from the player's own `skater.pat`,
 /// found under `IW4L_SKATE3_DATA`), the trick sequence and a trick queued by
@@ -174,10 +177,10 @@ fn fire(state: &mut FlickIt, out: &mut net::ClientActionInput, id: u8, strength:
 pub(crate) fn sample_flick_it(
     time: Res<Time>,
     pads: Query<&Gamepad>,
-    presented: Res<net::PresentedSnapshot>,
-    local: Res<net::LocalPresentClient>,
+    (presented, local): (Res<net::PresentedSnapshot>, Res<net::LocalPresentClient>),
     menu: Res<MenuEnabled>,
     mut out: ResMut<net::ClientActionInput>,
+    mut look: ResMut<net::LookState>,
     mut state: ResMut<FlickIt>,
 ) {
     let now = time.elapsed_secs();
@@ -187,9 +190,10 @@ pub(crate) fn sample_flick_it(
     if let Some((id, strength)) = state.queued.take() {
         fire(&mut state, &mut out, id, strength, now);
     }
-    let skating = presented
+    let skater = presented
         .alive_player(local.0)
-        .is_some_and(|ps| movement_iw4::MoveMode::of(ps) == movement_iw4::MoveMode::Skate);
+        .filter(|ps| movement_iw4::MoveMode::of(ps) == movement_iw4::MoveMode::Skate);
+    let skating = skater.is_some();
     let aiming = pads
         .iter()
         .any(|pad| pad.pressed(GamepadButton::LeftTrigger2));
@@ -198,6 +202,12 @@ pub(crate) fn sample_flick_it(
         return;
     }
     out.pad_look = [0.0; 2];
+    // The right stick is busy with tricks, so the view follows the board.
+    if let Some(ps) = skater.filter(|_| !pads.is_empty()) {
+        let gap = (ps.skate_yaw - ps.viewangles[1] + 540.0).rem_euclid(360.0) - 180.0;
+        let turn = gap * (FOLLOW_BOARD_RATE * time.delta_secs()).min(1.0);
+        look.angles[1] = look.angles[1].wrapping_add((turn * input_iw4::ANGLE2SHORT) as i32);
+    }
     if !state.loaded {
         state.loaded = true;
         state.recognizer = load_recognizer();

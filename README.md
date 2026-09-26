@@ -101,6 +101,8 @@ Changes on top of upstream, newest last. Every change is recorded here.
   Without a pad, `trick <name> [strength]` fires one. Recogniser:
   `crates/skate_input`; trick table: `crates/movement_iw4/src/skate_tricks.rs`;
   the trick rides in `UserCmd::skate_trick` so the sim stays deterministic.
+  With a pad, while skating and not aiming, the view swings round to follow
+  the board, since the right stick is busy with tricks.
   The board is not drawn yet, so tricks show only as pops and catches.
 - **Windows test runs.** `cargo run -p approved_tests -- heavy_gameplay_lifecycle`
   works on Windows (junction for the shared cache, `iw4l.exe`, newest log when
