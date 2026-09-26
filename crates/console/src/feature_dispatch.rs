@@ -384,6 +384,7 @@ pub(crate) fn route_ui_commands(
         Option<Res<Focus>>,
         MessageWriter<MenuShellCmd>,
         Option<Res<MenuMapList>>,
+        MessageWriter<ui::ModMenuRequest>,
     ),
     identity: Option<Res<LaunchIdentity>>,
     (authority, authority_clock, presented): (
@@ -417,6 +418,19 @@ pub(crate) fn route_ui_commands(
                     echo("ui 1".into(), console, line);
                 }
                 _ => echo("usage: ui [0|1]".into(), console, line),
+            },
+
+            "modmenu" => match cmd.args.first().map(String::as_str) {
+                None | Some("pause") => {
+                    ui.6.write(ui::ModMenuRequest::Toggle { pause: true });
+                }
+                Some("live") => {
+                    ui.6.write(ui::ModMenuRequest::Toggle { pause: false });
+                }
+                Some("close") => {
+                    ui.6.write(ui::ModMenuRequest::Close);
+                }
+                Some(_) => echo("usage: modmenu [pause|live|close]".into(), console, line),
             },
 
             "menu" => match parse_menu_args(&cmd.args) {
@@ -1334,6 +1348,10 @@ pub fn register_feature_commands(registry: &mut crate::ConsoleRegistry, maps: &[
             "finish_run — finish the run's screenshots, then quit (not a retail command string)",
         ),
         ("ui", "ui [0|1] — hide/show game UI; console Overlay stays"),
+        (
+            "modmenu",
+            "modmenu [pause|live|close] — toggle the mod menu (F5 pauses, F6 keeps the game running)",
+        ),
         (
             "dump",
             "dump [name] - atomically write the current authority + presented state to iw4l-artifacts/dumps/<timestamp>-<name>.txt (one shot; no history or timing)",

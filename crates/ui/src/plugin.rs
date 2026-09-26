@@ -9,6 +9,7 @@ use crate::layers::{GameUiFontPlugin, UiLayersPlugin};
 use crate::loading::{poll_loading_preview, spawn_loading_screen, update_loading_screen};
 use crate::menu::MenuPlugin;
 use crate::menu_shots::{MenuShotPlan, run_menu_shots};
+use crate::mod_menu::ModMenuPlugin;
 use crate::screen::register_screen_systems;
 
 pub struct UiPlugin;
@@ -21,6 +22,7 @@ impl Plugin for UiPlugin {
             UiLayersPlugin,
             MenuPlugin,
             ClassSelectPlugin,
+            ModMenuPlugin,
         ))
         .add_systems(Startup, spawn_loading_screen)
         .add_systems(

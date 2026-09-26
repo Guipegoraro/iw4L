@@ -13,6 +13,7 @@ mod menu;
 mod menu_import;
 mod menu_load;
 mod menu_shots;
+mod mod_menu;
 mod model;
 mod nav;
 mod options;
@@ -53,6 +54,9 @@ pub use menu::{
     PendingMenuBgPixels, PendingMenuMap,
 };
 pub use menu_shots::MenuShotPlan;
+pub use mod_menu::{
+    MOD_MENU_ROOT, ModMenuAppExt, ModMenuEntry, ModMenuPage, ModMenuRequest, ModMenuView,
+};
 pub use model::{Content, Screen, ScreenCmd, SettingKey, SettingValue, UiIntent, Widget};
 pub use nav::{Focus, Hover, MenuShellCmd, NavDir};
 pub use options::{

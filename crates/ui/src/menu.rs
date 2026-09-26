@@ -374,6 +374,7 @@ struct ShellExtras<'w> {
     class_status: Res<'w, crate::ClassSelectStatus>,
     class_store: Res<'w, SessionClassStore>,
     class_icons: Res<'w, crate::ClassSelectIconCache>,
+    mod_menu: Res<'w, crate::mod_menu::ModMenuView>,
 }
 
 fn window_layout_key(windows: &Query<&Window, With<PrimaryWindow>>) -> Option<(u32, u32, u32)> {
@@ -417,6 +418,7 @@ fn bump_shell_revision(
         || extras.class_status.is_changed()
         || extras.class_store.is_changed()
         || extras.class_icons.is_changed()
+        || extras.mod_menu.is_changed()
         || extras.scratch.is_changed()
         || extras.catalog.is_changed()
         || extras.maps.is_changed()

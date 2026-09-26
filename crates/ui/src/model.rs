@@ -203,6 +203,10 @@ pub enum UiIntent {
     Quit,
     Disconnect,
 
+    /// Queue a console line (mod menu entries).
+    ConsoleLine(String),
+    CloseModMenu,
+
     CacSelectSlot(u32),
 
     CacEditRow(u8),

@@ -53,6 +53,7 @@ pub(crate) struct RetailPaintCtx<'w> {
     class_status: Res<'w, crate::ClassSelectStatus>,
     class_icons: Res<'w, crate::ClassSelectIconCache>,
     strings: Option<Res<'w, assets::PreparedLocalizedStrings>>,
+    mod_menu: Res<'w, crate::mod_menu::ModMenuView>,
 }
 
 #[derive(SystemParam)]
@@ -162,6 +163,7 @@ pub(crate) fn spawn_retail_shell(
         browser_enabled,
         browser,
         bridge,
+        mod_menu: Some(&paint.mod_menu),
     };
     let screens = screens::resolve_stack(catalog, &stack.names, host);
     if !stack.visible_exp_gap_said {
@@ -631,7 +633,9 @@ fn run_screen_cmds(
                 | UiIntent::CommitPlayerNameEdit(_)
                 | UiIntent::CancelPlayerNameEdit
                 | UiIntent::Disconnect
-                | UiIntent::SelectClass(_),
+                | UiIntent::SelectClass(_)
+                | UiIntent::ConsoleLine(_)
+                | UiIntent::CloseModMenu,
             ) => {}
             ScreenCmd::Emit(intent) => {
                 diag::warn!(Ui, "menu: UiIntent `{intent:?}` not routed (typed gap)");
@@ -716,7 +720,9 @@ pub(crate) fn handle_retail_clicks(
                 | UiIntent::CacCancelRename
                 | UiIntent::CacCancelEdit
                 | UiIntent::Disconnect
-                | UiIntent::SelectClass(_)),
+                | UiIntent::SelectClass(_)
+                | UiIntent::ConsoleLine(_)
+                | UiIntent::CloseModMenu),
             ) = cmd
             {
                 writers.intents.write(intent.clone());
@@ -780,7 +786,9 @@ pub(crate) fn handle_menu_back(
         return;
     };
     let maps = maps.as_ref().map(|m| m.0.as_slice()).unwrap_or(&[]);
-    let mut back = keys.just_pressed(KeyCode::Escape);
+    // F2 is a second Escape in game.
+    let mut back = keys.just_pressed(KeyCode::Escape)
+        || (keys.just_pressed(KeyCode::F2) && *occupancy.screen == frame::AppScreen::InGame);
     let mut left = keys.just_pressed(KeyCode::ArrowLeft) || keys.just_pressed(KeyCode::KeyA);
     for cmd in cmds.read() {
         if matches!(cmd, crate::nav::MenuShellCmd::Back) {
@@ -799,6 +807,10 @@ pub(crate) fn handle_menu_back(
         return;
     }
     if *occupancy.screen == frame::AppScreen::ClassSelect {
+        return;
+    }
+    if back && stack.names.last().map(String::as_str) == Some(crate::mod_menu::MOD_MENU_ROOT) {
+        crate::mod_menu::close(&mut stack, &mut occupancy.enabled, &mut focus);
         return;
     }
     if back && stack.names.last().map(String::as_str) == Some("ingame_options") {

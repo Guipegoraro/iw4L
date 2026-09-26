@@ -32,6 +32,7 @@ pub struct Host<'a> {
     pub browser_enabled: bool,
     pub browser: Option<&'a net::MasterBrowserSnapshot>,
     pub bridge: Option<&'a net::MasterBridgeState>,
+    pub mod_menu: Option<&'a crate::mod_menu::ModMenuView>,
 }
 
 impl<'a> Host<'a> {
@@ -55,6 +56,7 @@ impl<'a> Host<'a> {
             browser_enabled: false,
             browser: None,
             bridge: None,
+            mod_menu: None,
         }
     }
 }
@@ -82,6 +84,7 @@ pub fn lookup(id: &str, host: Host<'_>) -> Option<Screen> {
         )),
         "class_setup" => Some(class_setup(host)),
         "options" | "options_multi" => Some(options(host)),
+        id if crate::mod_menu::is_mod_menu(id) => Some(crate::mod_menu::screen(id, host.mod_menu)),
         _ => None,
     }
 }
@@ -2960,7 +2963,7 @@ fn retail_lobby_background(prefix: &str) -> Vec<Widget> {
     ]
 }
 
-fn dim(id: &str) -> Widget {
+pub(crate) fn dim(id: &str) -> Widget {
     Widget {
         id: id.into(),
         rect: Rect640 {
@@ -2986,7 +2989,7 @@ fn dim(id: &str) -> Widget {
     }
 }
 
-fn label(id: &str, x: f32, y: f32, w: f32, h: f32, scale: f32, text: &str) -> Widget {
+pub(crate) fn label(id: &str, x: f32, y: f32, w: f32, h: f32, scale: f32, text: &str) -> Widget {
     Widget {
         id: id.into(),
         rect: Rect640 {
@@ -3015,7 +3018,7 @@ fn label(id: &str, x: f32, y: f32, w: f32, h: f32, scale: f32, text: &str) -> Wi
     }
 }
 
-fn retail_title(id: &str, x: f32, y: f32, w: f32, text: &str) -> Widget {
+pub(crate) fn retail_title(id: &str, x: f32, y: f32, w: f32, text: &str) -> Widget {
     let mut widget = label(id, x, y, w, 28.0, 0.5, text);
     widget.style.font_enum = 9;
     widget.style.text_align_mode = 6;
@@ -3100,7 +3103,7 @@ fn image(id: &str, x: f32, y: f32, w: f32, h: f32, stem: &str) -> Widget {
     }
 }
 
-fn button(
+pub(crate) fn button(
     id: &str,
     x: f32,
     y: f32,
