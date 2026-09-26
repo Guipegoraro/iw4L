@@ -482,6 +482,16 @@ pub(crate) fn encode_action(out: &mut WireWriter, action: &ClientAction) {
             out.put_u32(request_id);
             out.put_u32(mode);
         }
+        ClientAction::SetCheat {
+            request_id,
+            cheat,
+            switch,
+        } => {
+            out.put_u8(18);
+            out.put_u32(request_id);
+            out.put_u32(cheat);
+            out.put_u8(switch as u8);
+        }
         ClientAction::ForceDeath { request_id } => {
             out.put_u8(4);
             out.put_u32(request_id);
@@ -583,6 +593,12 @@ pub(crate) fn decode_action(input: &mut WireReader<'_>) -> Result<ClientAction, 
         17 => Ok(ClientAction::SetMoveMode {
             request_id: input.get_u32()?,
             mode: input.get_u32()?,
+        }),
+        18 => Ok(ClientAction::SetCheat {
+            request_id: input.get_u32()?,
+            cheat: input.get_u32()?,
+            switch: sim::cheat::Switch::from_u8(input.get_u8()?)
+                .ok_or(WireError::Malformed("unknown cheat switch"))?,
         }),
         11 => {
             let request_id = input.get_u32()?;

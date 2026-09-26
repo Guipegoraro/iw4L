@@ -62,6 +62,8 @@ pub enum DamageRefusal {
     MissingTarget,
     TargetNotAlive,
     StaleLife,
+    /// The target has god mode on.
+    God,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -574,6 +576,9 @@ pub(crate) fn apply_damage_attempt(
     };
     if meta.lifecycle != ClientLifecycle::Alive {
         return DamageOutcome::Refused(DamageRefusal::TargetNotAlive);
+    }
+    if meta.cheats & crate::cheat::GOD != 0 {
+        return DamageOutcome::Refused(DamageRefusal::God);
     }
 
     if world.bootstrap_ref().kind.is_team()

@@ -666,6 +666,8 @@ pub struct ClientMatchState {
     pub radar_until_ms: i32,
     pub last_combat_weapon: u32,
     pub remote_missile: Option<RemoteMissile>,
+    /// IW4L cheat toggles, bits from [`crate::cheat`].
+    pub cheats: u32,
 
     pub(crate) cur_death_streak: i32,
 

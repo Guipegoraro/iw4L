@@ -78,6 +78,13 @@ pub enum ClientAction {
         request_id: ActionRequestId,
     },
 
+    /// Turn a cheat (a bit from `crate::cheat`) on, off or over; cheats only.
+    SetCheat {
+        request_id: ActionRequestId,
+        cheat: u32,
+        switch: crate::cheat::Switch,
+    },
+
     /// Switch an Alive player's movement mode (`MoveMode as u32`); cheats only.
     SetMoveMode {
         request_id: ActionRequestId,
@@ -139,6 +146,7 @@ pub fn action_request_id(action: &ClientAction) -> ActionRequestId {
         | ClientAction::DebugDamage { request_id, .. }
         | ClientAction::DebugHeal { request_id }
         | ClientAction::SetMoveMode { request_id, .. }
+        | ClientAction::SetCheat { request_id, .. }
         | ClientAction::SetName { request_id, .. }
         | ClientAction::UseCopycat { request_id } => request_id,
     }

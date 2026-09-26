@@ -88,6 +88,12 @@ pub(crate) fn register_debug_move_commands(registry: &mut ConsoleRegistry) {
             "movemode [normal|skate|noclip] — show or switch the movement mode (needs cheats; invented)",
         ));
     }
+    if registry.resolve("god").is_none() {
+        registry
+            .register(crate::CommandSpec::new("god").usage(
+                "god [on|off] — take no damage; toggles when bare (needs cheats; invented)",
+            ));
+    }
     if registry.resolve("noclip").is_none() {
         registry.register(
             crate::CommandSpec::new("noclip")
@@ -428,6 +434,37 @@ pub(crate) fn route_debug_move_commands(
                     seq: &mut seq,
                 };
                 let msg = cheat.queue("heal", |request_id| ClientAction::DebugHeal { request_id });
+                echo(msg, &mut console, &mut line);
+            }
+            name if sim::cheat::NAMES.iter().any(|(n, _)| *n == name) => {
+                let cheat = sim::cheat::NAMES
+                    .iter()
+                    .find(|(n, _)| *n == name)
+                    .map_or(0, |(_, bit)| *bit);
+                let switch = match cmd.args.first().map(String::as_str) {
+                    None => Some(sim::cheat::Switch::Toggle),
+                    Some("on" | "1") => Some(sim::cheat::Switch::On),
+                    Some("off" | "0") => Some(sim::cheat::Switch::Off),
+                    Some(_) => None,
+                };
+                let msg = match switch {
+                    Some(switch) => {
+                        let mut gate = CheatQueue {
+                            presented: &presented,
+                            local: local.0,
+                            authority: authority.as_deref(),
+                            inbox: inbox.as_deref_mut(),
+                            seq: &mut seq,
+                        };
+                        let queued = gate.queue(name, |request_id| ClientAction::SetCheat {
+                            request_id,
+                            cheat,
+                            switch,
+                        });
+                        format!("{queued} {switch:?}")
+                    }
+                    None => format!("usage: {name} [on|off]"),
+                };
                 echo(msg, &mut console, &mut line);
             }
             "movemode" | "skate" | "noclip" => {

@@ -1259,6 +1259,16 @@ fn apply_actions(world: &mut FrameWorld, tick: Tick, actions: &[(ClientId, Clien
                 request_id: _,
                 mode,
             } => apply_set_move_mode(world, *id, mode),
+            ClientAction::SetCheat {
+                request_id: _,
+                cheat,
+                switch,
+            } => {
+                if world.bootstrap_ref().allow_debug_actions && world.client_meta(*id).is_some() {
+                    let meta = world.client_meta_mut(*id);
+                    meta.cheats = switch.apply(meta.cheats, cheat);
+                }
+            }
         }
     }
 }
@@ -1439,7 +1449,7 @@ fn apply_debug_damage(world: &mut FrameWorld, tick: Tick, id: ClientId, amount: 
     }
     if !world
         .client_meta(id)
-        .is_some_and(|m| m.lifecycle == ClientLifecycle::Alive)
+        .is_some_and(|m| m.lifecycle == ClientLifecycle::Alive && m.cheats & crate::cheat::GOD == 0)
     {
         return;
     }

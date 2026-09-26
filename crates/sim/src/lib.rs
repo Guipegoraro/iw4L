@@ -118,6 +118,42 @@ pub use identities::{
 pub use input::{ActionRequestId, ClassId, ClientAction, SpawnPick, TickInput, action_request_id};
 pub use mantle_xanim::MantleXAnimBind;
 pub use movement_iw4::MoveMode;
+
+/// IW4L cheat toggles, kept per player in `ClientMatchState::cheats`. A new
+/// cheat is a bit here, a check where it bites, and a console name.
+pub mod cheat {
+    /// Damage is refused.
+    pub const GOD: u32 = 1;
+
+    pub const NAMES: &[(&str, u32)] = &[("god", GOD)];
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    #[repr(u8)]
+    pub enum Switch {
+        Off = 0,
+        On = 1,
+        Toggle = 2,
+    }
+
+    impl Switch {
+        pub fn from_u8(raw: u8) -> Option<Self> {
+            match raw {
+                0 => Some(Self::Off),
+                1 => Some(Self::On),
+                2 => Some(Self::Toggle),
+                _ => None,
+            }
+        }
+
+        pub fn apply(self, flags: u32, cheat: u32) -> u32 {
+            match self {
+                Self::Off => flags & !cheat,
+                Self::On => flags | cheat,
+                Self::Toggle => flags ^ cheat,
+            }
+        }
+    }
+}
 pub use match_state::{
     CLASS_CATALOG_BLING, CLASS_CATALOG_COLD_BLOODED, CLASS_CATALOG_DANGER_CLOSE,
     CLASS_CATALOG_LIGHTWEIGHT, CLASS_CATALOG_MARATHON, CLASS_CATALOG_NINJA,

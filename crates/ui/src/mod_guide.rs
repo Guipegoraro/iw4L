@@ -213,6 +213,7 @@ fn default_topics() -> Vec<ModGuideTopic> {
             .line("skate [on|off]  -  toggle the skateboard")
             .line("movemode [normal|skate|noclip]  -  show or set the movement mode")
             .line("heal  -  restore your health")
+            .line("god [on|off]  -  take no damage")
             .line("noclip [on|off]  -  fly through walls: jump up, crouch down, sprint fast")
             .line("modmenu [pause|live|close]  -  open or close the mod menu")
             .line("")
