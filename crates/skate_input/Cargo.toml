@@ -1,0 +1,9 @@
+[package]
+name = "skate_input"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Skate 3 flick-it stick gestures: the pattern recognizer and the PAT gesture-file parser. Pure and tick-based."
+
+[lints]
+workspace = true

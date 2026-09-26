@@ -64,6 +64,7 @@ members = [
     "crates/replay",
     "crates/session",
     "crates/sim",
+    "crates/skate_input",
     "crates/trace_iw4",
     "crates/ui",
     "crates/updater",
@@ -149,6 +150,7 @@ marks_iw4 = { path = "crates/marks_iw4" }
 math_iw4 = { path = "crates/math_iw4" }
 master_protocol = { path = "crates/master_protocol" }
 movement_iw4 = { path = "crates/movement_iw4" }
+skate_input = { path = "crates/skate_input" }
 net = { path = "crates/net" }
 perf = { path = "crates/perf" }
 playerstate_iw4 = { path = "crates/playerstate_iw4" }

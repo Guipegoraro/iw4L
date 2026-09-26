@@ -90,10 +90,25 @@ Changes on top of upstream, newest last. Every change is recorded here.
 - **`IW4L_TIME_LIMIT`** sets the match time limit in minutes; `0` plays with
   no limit (e.g. `IW4L_TIME_LIMIT=0` in `.env`). `IW4L_SCORE_LIMIT` already
   existed.
+- **Skate 3 flick-it recogniser** (`crates/skate_input`): turns right-stick
+  paths into tricks using Skate 3's own gesture files (`skater.pat`, loaded
+  from the player's extraction). Not wired into the game yet.
 - **Windows test runs.** `cargo run -p approved_tests -- heavy_gameplay_lifecycle`
   works on Windows (junction for the shared cache, `iw4l.exe`, newest log when
   there is no `latest.log`). `IW4L_KEEP_CWD=1` stops the launcher moving into
   its own folder.
+
+### Credits for this fork
+
+- **skate-3-rust-engine** (`SK8-ENGINE/skate-3-rust-engine`, a Rust/Bevy
+  Skate 3 reimplementation). `crates/skate_input` is ported from its
+  `crates/skate-core/src/input/gesture.rs` (the flick-it pattern recogniser:
+  per-point tolerances, miss culling, wind-up hold, scoring and flick
+  strength) and `crates/skate-data/src/gesture_patterns.rs` (the PAT gesture
+  file parser), with the decompiler address notes removed. Its survey of Skate
+  3's pop height, chase camera shots and animation pipeline shapes the skate
+  cards still to come. Gesture files, animations and models come from the
+  player's own Skate 3 disc and are never committed here.
 
 ## Architecture
 
