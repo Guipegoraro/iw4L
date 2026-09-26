@@ -4,6 +4,7 @@ pub mod iwd;
 pub mod load_jobs;
 pub mod namespace_trees;
 pub mod progress;
+pub mod rawfiles;
 pub mod zone;
 
 pub use artifact_cache::{CacheFlight, cache_flight, cache_get, cache_put, fnv1a64, fnv1a64_more};
@@ -21,6 +22,7 @@ pub use iwd::{
     inflate_zlib, iwd_entry_reads, iwd_read_cost, read_iwd_named, read_text,
 };
 pub use load_jobs::{CacheResult, Job, JobKind};
+pub use rawfiles::{RawFileExport, export_t5_rawfiles};
 pub use namespace_trees::{NamespaceSoundIwd, NamespaceTree, NamespaceTrees};
 pub use progress::{
     LoadLaneTiming, LoadProgress, LoadSnapshot, StageEnd, StageHandle, StageId, StageKey,

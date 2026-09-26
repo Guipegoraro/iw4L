@@ -244,6 +244,7 @@ pub use createfx::{
     CreateFxLoopSound, CreateFxOneshot, CreateFxOneshotEmitters, apply_createfx_effect_aliases,
     parse_createfx_effect_aliases, parse_createfx_loop_sounds, parse_createfx_oneshots,
 };
+pub use asset_transport::{RawFileExport, export_t5_rawfiles};
 pub use discover::{
     GamesRoot, ZoneFile, ensure_artifacts_dir, find_common_mp_for_envelope,
     find_common_mp_for_zone, find_localized_common_mp_for_zone, find_runtime_common_mp,

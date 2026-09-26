@@ -141,11 +141,36 @@ pub fn launch(
             }
             run_export_gltf(games, artifacts, zone);
         }
+        LaunchMode::ExportRawfiles(zone) => run_export_rawfiles(&games, &artifacts, &zone),
         LaunchMode::Play {
             name,
             zone_override,
         } => run_play(games, artifacts, name, zone_override, acceptance),
     }
+}
+
+/// Write a zone's raw files (scripts, configs, tables) under
+/// `iw4l-artifacts/rawfiles/<zone>/`. Black Ops zones only.
+fn run_export_rawfiles(games: &assets::GamesRoot, artifacts: &std::path::Path, zone_arg: &str) {
+    let found = find_zone_file(games, zone_arg)
+        .unwrap_or_else(|error| fatal(&format!("export-rawfiles: {error}")));
+    let game = assets::zone_game_for_path(&found.path)
+        .unwrap_or_else(|| fatal("export-rawfiles: source game could not be identified"));
+    if game != assets::ZoneGame::T5 {
+        fatal(&format!(
+            "export-rawfiles supports Black Ops (t5) zones only; {} is {}",
+            found.zone_name,
+            game.prefix()
+        ));
+    }
+    let out = artifacts.join("rawfiles").join(&found.zone_name);
+    let export = assets::export_t5_rawfiles(&found.path, &out)
+        .unwrap_or_else(|error| fatal(&format!("export-rawfiles: {error}")));
+    diag::announce_stdout(&out.display().to_string());
+    diag::announce_stdout(&format!(
+        "export-rawfiles: {} files, {} unpacked scripts, {} bytes",
+        export.files, export.inflated, export.bytes
+    ));
 }
 
 fn run_export_gltf(games: assets::GamesRoot, artifacts: PathBuf, zone_arg: String) {

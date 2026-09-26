@@ -116,6 +116,12 @@ Changes on top of upstream, newest last. Every change is recorded here.
   are single-player zones with other asset layouts (their clipmap has no
   brush table in IW4L's reader) and their gameplay is GSC script, which IW4L
   does not run.
+- **Export a zone's raw files.** `iw4l export-rawfiles t5:<zone>` writes every
+  raw file of a Black Ops zone (GSC/CSC scripts, aitype and character scripts,
+  configs) to `iw4l-artifacts/rawfiles/<zone>/`, unpacking the compressed
+  scripts to plain text. It is how the zombie scripts are read for porting,
+  and works the same on a custom map's or mod's zone. The output is your own
+  game data; keep it out of the repository.
 - **Windows test runs.** `cargo run -p approved_tests -- heavy_gameplay_lifecycle`
   works on Windows (junction for the shared cache, `iw4l.exe`, newest log when
   there is no `latest.log`). `IW4L_KEEP_CWD=1` stops the launcher moving into
