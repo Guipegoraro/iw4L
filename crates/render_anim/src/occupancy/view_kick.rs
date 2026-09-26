@@ -255,6 +255,7 @@ pub fn sync_camera_from_presented(
     mut lenses: Query<&mut Projection, With<FpvLens>>,
     view: Res<ViewSubject>,
     death_cam_clip: Res<crate::occupancy::dyn_ent::DynEntPhysClip>,
+    mut chase: Local<crate::occupancy::third_person::SkateChase>,
 ) {
     kick.killcam_focus_distance = None;
     if !sim_cam.enabled {
@@ -308,8 +309,20 @@ pub fn sync_camera_from_presented(
         return;
     }
     if presented_is_third_person(&presented, local.0, view.in_killcam()) {
-        let Some(pose) = death_watch_camera(&presented, local.0, death_cam_clip.0.as_deref())
-        else {
+        let chase_pose = if settings.skate_chase_cam && !view.in_killcam() {
+            crate::occupancy::third_person::skate_chase_camera(
+                &presented,
+                local.0,
+                death_cam_clip.0.as_deref(),
+                &mut chase,
+                clock.frametime_secs(),
+            )
+        } else {
+            None
+        };
+        let Some(pose) = chase_pose.or_else(|| {
+            death_watch_camera(&presented, local.0, death_cam_clip.0.as_deref())
+        }) else {
             return;
         };
         let eye = transform_from_iw_view(pose);

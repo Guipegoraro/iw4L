@@ -232,6 +232,7 @@ fn serialize_settings(settings: &frame::GameSettings, binds: &KeyBinds) -> Strin
         format!("invert_mouse={}", settings.invert_mouse),
         format!("player_name={safe_name}"),
         format!("third_person={}", settings.third_person),
+        format!("skate_chase_cam={}", settings.skate_chase_cam),
         "unbindall".to_owned(),
     ];
     lines.extend(binds.list_lines());
@@ -299,6 +300,11 @@ fn parse_settings(source: &str, settings: &mut frame::GameSettings, binds: &mut 
                     settings.third_person = value;
                 }
             }
+            "skate_chase_cam" => {
+                if let Ok(value) = value.parse() {
+                    settings.skate_chase_cam = value;
+                }
+            }
             _ => warn!("ignored unknown setting `{key}`"),
         }
     }
@@ -350,6 +356,24 @@ pub(crate) fn route_view_commands(
     console_settings: Res<crate::ConsoleSettings>,
 ) {
     for cmd in events.read() {
+        if cmd.name == "skatecam" {
+            let chase = match cmd.args.first().map(String::as_str) {
+                None => Some(!settings.skate_chase_cam),
+                Some("chase") => Some(true),
+                Some("shoulder") => Some(false),
+                Some(_) => None,
+            };
+            let msg = match chase {
+                Some(chase) => {
+                    settings.skate_chase_cam = chase;
+                    settings.touch();
+                    format!("skatecam {}", if chase { "chase" } else { "shoulder" })
+                }
+                None => "usage: skatecam [chase|shoulder]".to_owned(),
+            };
+            console.echo(msg, console_settings.log_capacity);
+            continue;
+        }
         if !matches!(cmd.name.as_str(), "thirdperson" | "cg_thirdperson") {
             continue;
         }

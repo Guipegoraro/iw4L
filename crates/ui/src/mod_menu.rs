@@ -516,7 +516,8 @@ fn default_pages() -> Vec<ModMenuPage> {
             .on_root("Skate")
             .command_and_close("Skate on", "skate on")
             .command_and_close("Skate off (walk)", "skate off")
-            .command("Third person on / off", "thirdperson"),
+            .command("Third person on / off", "thirdperson")
+            .command("Chase cam / shoulder cam", "skatecam"),
         ModMenuPage::new("world", "WORLD")
             .on_root("World")
             .command("Moon gravity (100)", "gravity 100")

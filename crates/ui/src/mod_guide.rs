@@ -194,6 +194,7 @@ fn default_topics() -> Vec<ModGuideTopic> {
             .line("You bail (1.5 s without control) when you land across the")
             .line("board, land too hard or roll into a wall.")
             .line("")
+            .line("thirdperson: see yourself; skatecam chase|shoulder picks the view.")
             .line("showpos on   shows speed and the board's state on screen."),
         ModGuideTopic::new("gamepad", "GAMEPAD")
             .line("XInput pads work (an 8BitDo in XInput mode shows up as an")

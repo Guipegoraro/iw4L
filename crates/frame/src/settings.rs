@@ -35,6 +35,8 @@ pub struct GameSettings {
     pub player_name: String,
     /// Third-person camera (`cg_thirdperson`).
     pub third_person: bool,
+    /// Skating in third person: Skate 3 chase cam (true) or the MW2 shoulder view.
+    pub skate_chase_cam: bool,
 
     pub revision: u64,
 }
@@ -51,6 +53,7 @@ impl Default for GameSettings {
             invert_mouse: false,
             player_name: "Player".to_owned(),
             third_person: false,
+            skate_chase_cam: true,
             revision: 0,
         }
     }

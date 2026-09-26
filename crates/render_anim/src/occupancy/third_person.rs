@@ -107,3 +107,87 @@ pub fn death_watch_camera(
         angles: view.angles,
     })
 }
+
+/// Skate 3's ground chase shot, in IW units (1 m ≈ 39.37): about 2 m behind
+/// the board, low, aimed a little ahead of it.
+const CHASE_DISTANCE: f32 = 80.0;
+const CHASE_HEIGHT: f32 = 22.0;
+const CHASE_FOCUS_Z: f32 = 30.0;
+const CHASE_AIM_AHEAD: f32 = 60.0;
+/// How fast the shot swings round behind the board (fraction of the gap per second).
+const CHASE_YAW_RATE: f32 = 5.0;
+
+/// The chase camera's smoothed heading, carried between frames.
+#[derive(Default)]
+pub struct SkateChase {
+    yaw: Option<f32>,
+}
+
+/// The skate chase camera while the local player skates, or `None`.
+pub fn skate_chase_camera(
+    presented: &PresentedSnapshot,
+    local: ClientId,
+    clip: Option<&ClipCollision>,
+    chase: &mut SkateChase,
+    dt: f32,
+) -> Option<WorldCameraPose> {
+    let ps = presented.player(local)?;
+    if movement_iw4::MoveMode::of(ps) != movement_iw4::MoveMode::Skate {
+        chase.yaw = None;
+        return None;
+    }
+    let target = ps.skate_yaw;
+    let yaw = match chase.yaw {
+        Some(yaw) => {
+            let gap = (target - yaw + 540.0).rem_euclid(360.0) - 180.0;
+            yaw + gap * (CHASE_YAW_RATE * dt).min(1.0)
+        }
+        None => target,
+    };
+    chase.yaw = Some(yaw);
+
+    let offset = presented.view_offset();
+    let focus = [
+        ps.origin[0] + offset[0],
+        ps.origin[1] + offset[1],
+        ps.origin[2] + offset[2] + CHASE_FOCUS_Z,
+    ];
+    let (sin, cos) = yaw.to_radians().sin_cos();
+    let wanted = [
+        focus[0] - cos * CHASE_DISTANCE,
+        focus[1] - sin * CHASE_DISTANCE,
+        focus[2] + CHASE_HEIGHT,
+    ];
+    let origin = match clip {
+        Some(clip) => {
+            let half = CG_CAMERA_PULLBACK_BOX_HALF;
+            let hit = clip.sweep_box(
+                focus,
+                wanted,
+                [-half, -half, -half],
+                [half, half, half],
+                CG_CAMERA_PULLBACK_CLIPMASK,
+            );
+            let f = hit.fraction;
+            [
+                focus[0] + (wanted[0] - focus[0]) * f,
+                focus[1] + (wanted[1] - focus[1]) * f,
+                focus[2] + (wanted[2] - focus[2]) * f,
+            ]
+        }
+        None => wanted,
+    };
+    let aim = [
+        focus[0] + cos * CHASE_AIM_AHEAD,
+        focus[1] + sin * CHASE_AIM_AHEAD,
+        focus[2],
+    ];
+    let flat = (aim[0] - origin[0]).hypot(aim[1] - origin[1]).max(1.0);
+    // IW pitch is positive looking down.
+    let pitch = (origin[2] - aim[2]).atan2(flat).to_degrees();
+    let aim_yaw = (aim[1] - origin[1]).atan2(aim[0] - origin[0]).to_degrees();
+    Some(WorldCameraPose {
+        origin,
+        angles: [pitch, aim_yaw, 0.0],
+    })
+}

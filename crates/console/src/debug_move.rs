@@ -83,6 +83,11 @@ pub(crate) fn register_debug_move_commands(registry: &mut ConsoleRegistry) {
                 .usage("thirdperson [on|off] — third-person camera; toggles when bare (saved)"),
         );
     }
+    if registry.resolve("skatecam").is_none() {
+        registry.register(crate::CommandSpec::new("skatecam").usage(
+            "skatecam [chase|shoulder] — third-person camera while skating; toggles when bare (saved)",
+        ));
+    }
     if registry.resolve("movemode").is_none() {
         registry.register(crate::CommandSpec::new("movemode").usage(
             "movemode [normal|skate|noclip] — show or switch the movement mode (needs cheats; invented)",

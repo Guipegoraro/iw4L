@@ -82,7 +82,10 @@ Changes on top of upstream, newest last. Every change is recorded here.
   saved with the settings) moves the camera behind the player with the
   retail third-person camera, your own body drawn. Like retail, the camera
   stops at walls and the map's invisible edges, so with one right behind you
-  it sits close and your body can drop below the frame.
+  it sits close and your body can drop below the frame. While skating in
+  third person the camera is Skate 3's low chase shot behind the board
+  (about 2 m back, swinging round with the board); `skatecam
+  [chase|shoulder]` (mod menu: Skate) switches to the MW2 shoulder view.
 - **Mod guide.** The pause menu (Esc) has a **Mod Guide** entry: how to use
   every addition, one page per topic. A feature adds its own page with
   `app.add_mod_guide_topic(..)` (`crates/ui/src/mod_guide.rs`).
