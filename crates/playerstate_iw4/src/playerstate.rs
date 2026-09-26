@@ -121,6 +121,12 @@ pub struct PlayerState {
     pub skate_pop_ms: i32,
     /// Skate mode: time left in a bail, in ms; no control while above zero.
     pub skate_bail_ms: i32,
+    /// Skate mode: the last trick sequence the sim ran (`UserCmd::skate_trick`).
+    pub skate_trick_seq: i32,
+    /// Skate mode: the trick in the air (`movement_iw4::skate_trick` id), 0 none.
+    pub skate_trick: i32,
+    /// Skate mode: ms since that trick popped.
+    pub skate_trick_ms: i32,
 }
 
 pub mod eflags {
@@ -304,6 +310,9 @@ impl PlayerState {
         skate_yaw: 0.0,
         skate_pop_ms: 0,
         skate_bail_ms: 0,
+        skate_trick_seq: 0,
+        skate_trick: 0,
+        skate_trick_ms: 0,
     };
 
     pub fn anim(&self) -> AnimPair {

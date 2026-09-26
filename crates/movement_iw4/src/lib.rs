@@ -28,6 +28,7 @@ mod pml;
 mod pmove;
 mod single;
 mod skate;
+mod skate_tricks;
 mod slide;
 mod snap;
 mod sprint;
@@ -101,6 +102,7 @@ pub use melee_charge::{
 pub use mode::{MoveMode, pm_set_move_mode};
 pub use noclip::{NOCLIP_SPEED, pm_noclip_move};
 pub use pml::Pml;
+pub use skate_tricks::{SKATE_TRICKS, SkateTrick, skate_trick, skate_trick_id};
 pub use pmove::Pmove;
 pub use single::{
     GroundTraceInput, MoveBounds, PmoveResult, PmoveSingle, PmoveSingleContext, pm_move,

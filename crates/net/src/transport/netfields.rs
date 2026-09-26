@@ -371,6 +371,9 @@ ps_netfields! {
     skate_yaw: f32 = "skateYaw", 0, Replication::Replicated, Validation::Exact;
     skate_pop_ms: i32 = "skatePopMs", 0, Replication::Replicated, Validation::Exact;
     skate_bail_ms: i32 = "skateBailMs", 0, Replication::Replicated, Validation::Exact;
+    skate_trick_seq: i32 = "skateTrickSeq", 0, Replication::Replicated, Validation::Exact;
+    skate_trick: i32 = "skateTrick", 0, Replication::Replicated, Validation::Exact;
+    skate_trick_ms: i32 = "skateTrickMs", 0, Replication::Replicated, Validation::Exact;
 }
 
 pub const PS_FIELD_COUNT: usize = PS_NETFIELDS.len();

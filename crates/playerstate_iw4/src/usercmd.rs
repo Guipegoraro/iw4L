@@ -12,6 +12,9 @@ pub struct UserCmd {
     pub melee_charge_dist: u8,
     pub selected_location: [u8; 3],
     pub remote_control: [u8; 2],
+    /// IW4L skate flick-it: `[sequence, trick id, strength 0..=255]`. The sim
+    /// runs a trick when the sequence differs from `ps.skate_trick_seq`.
+    pub skate_trick: [u8; 3],
 }
 
 pub mod buttons {

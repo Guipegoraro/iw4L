@@ -52,6 +52,8 @@ pub struct ClientActionInput {
     pub pad_move: [f32; 2],
     /// Gamepad right stick this frame, `[pitch, yaw]` in degrees to turn.
     pub pad_look: [f32; 2],
+    /// Skate flick-it, copied into `UserCmd::skate_trick`.
+    pub skate_trick: [u8; 3],
 }
 
 impl Default for ClientActionInput {
@@ -74,6 +76,7 @@ impl Default for ClientActionInput {
             frame_msec: 16,
             pad_move: [0.0; 2],
             pad_look: [0.0; 2],
+            skate_trick: [0; 3],
         }
     }
 }
@@ -145,7 +148,7 @@ pub fn build_usercmd(input: &mut ClientActionInput, look: &LookState, server_tim
     );
     let (mouse_pitch, mouse_yaw) = mouse_move_angles(mx, my, input.m_yaw, input.m_pitch);
 
-    create_cmd(&CreateCmdInput {
+    let mut cmd = create_cmd(&CreateCmdInput {
         server_time,
         angles: look.angles,
         buttons: bits,
@@ -156,7 +159,9 @@ pub fn build_usercmd(input: &mut ClientActionInput, look: &LookState, server_tim
         key_pitch_delta: (input.pad_look[0] * ANGLE2SHORT) as i32,
         key_yaw_delta: (input.pad_look[1] * ANGLE2SHORT) as i32,
         frozen: false,
-    })
+    });
+    cmd.skate_trick = input.skate_trick;
+    cmd
 }
 
 pub fn remote_control_axes(input: &ClientActionInput, mouse_x: f32, mouse_y: f32) -> [u8; 2] {

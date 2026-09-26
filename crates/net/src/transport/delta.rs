@@ -402,6 +402,7 @@ pub(crate) fn encode_usercmd(out: &mut WireWriter, cmd: &UserCmd) {
     out.put_u8(cmd.melee_charge_dist);
     out.put_bytes(&cmd.selected_location);
     out.put_bytes(&cmd.remote_control);
+    out.put_bytes(&cmd.skate_trick);
 }
 
 pub(crate) fn decode_usercmd(input: &mut WireReader<'_>) -> Result<UserCmd, WireError> {
@@ -422,6 +423,8 @@ pub(crate) fn decode_usercmd(input: &mut WireReader<'_>) -> Result<UserCmd, Wire
     input.get_bytes(&mut selected_location)?;
     let mut remote_control = [0u8; 2];
     input.get_bytes(&mut remote_control)?;
+    let mut skate_trick = [0u8; 3];
+    input.get_bytes(&mut skate_trick)?;
     Ok(UserCmd {
         server_time,
         buttons,
@@ -435,5 +438,6 @@ pub(crate) fn decode_usercmd(input: &mut WireReader<'_>) -> Result<UserCmd, Wire
         melee_charge_dist,
         selected_location,
         remote_control,
+        skate_trick,
     })
 }

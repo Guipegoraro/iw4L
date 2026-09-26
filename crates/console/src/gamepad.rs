@@ -115,3 +115,161 @@ pub(crate) fn log_pad_connections(pads: Query<(Entity, &Name), Added<Gamepad>>) 
         diag::info!(Console, "gamepad connected: {name} ({entity})");
     }
 }
+
+/// Skate 3 samples the stick at 60 Hz; the recogniser counts those ticks.
+const FLICK_HZ: f32 = 60.0;
+/// How long a fired trick stays in the command before only its sequence
+/// remains, so a stale trick never replays after a respawn.
+const TRICK_HOLD_SECS: f32 = 0.3;
+const FLICK_DEADZONE: f32 = 0.1;
+
+/// Flick-it state: the recogniser (from the player's own `skater.pat`,
+/// found under `IW4L_SKATE3_DATA`), the trick sequence and a trick queued by
+/// the `trick` console command.
+#[derive(Resource, Default)]
+pub(crate) struct FlickIt {
+    recognizer: Option<skate_input::Recognizer>,
+    loaded: bool,
+    carry: f32,
+    seq: u8,
+    fired_at: f32,
+    queued: Option<(u8, u8)>,
+}
+
+fn load_recognizer() -> Option<skate_input::Recognizer> {
+    let Some(root) = std::env::var_os("IW4L_SKATE3_DATA") else {
+        diag::warn!(
+            Console,
+            "flick-it: IW4L_SKATE3_DATA is not set (the folder holding data/joystick/skater.pat); right-stick tricks are off"
+        );
+        return None;
+    };
+    let path = std::path::Path::new(&root).join("data/joystick/skater.pat");
+    match skate_input::load_pat(&path).and_then(skate_input::Recognizer::new) {
+        Ok(recognizer) => {
+            diag::info!(
+                Console,
+                "flick-it: {} gestures from {}",
+                recognizer.patterns().len(),
+                path.display()
+            );
+            Some(recognizer)
+        }
+        Err(error) => {
+            diag::warn!(Console, "flick-it: {error}");
+            None
+        }
+    }
+}
+
+fn fire(state: &mut FlickIt, out: &mut net::ClientActionInput, id: u8, strength: u8, now: f32) {
+    state.seq = state.seq.wrapping_add(1).max(1);
+    state.fired_at = now;
+    out.skate_trick = [state.seq, id, strength];
+}
+
+/// While skating (and not aiming with LT), the right stick is sampled into
+/// the recogniser instead of looking; a trick goes out as
+/// `[sequence, id, strength]` in the command.
+pub(crate) fn sample_flick_it(
+    time: Res<Time>,
+    pads: Query<&Gamepad>,
+    presented: Res<net::PresentedSnapshot>,
+    local: Res<net::LocalPresentClient>,
+    menu: Res<MenuEnabled>,
+    mut out: ResMut<net::ClientActionInput>,
+    mut state: ResMut<FlickIt>,
+) {
+    let now = time.elapsed_secs();
+    if now - state.fired_at > TRICK_HOLD_SECS {
+        out.skate_trick = [state.seq, 0, 0];
+    }
+    if let Some((id, strength)) = state.queued.take() {
+        fire(&mut state, &mut out, id, strength, now);
+    }
+    let skating = presented
+        .alive_player(local.0)
+        .is_some_and(|ps| movement_iw4::MoveMode::of(ps) == movement_iw4::MoveMode::Skate);
+    let aiming = pads
+        .iter()
+        .any(|pad| pad.pressed(GamepadButton::LeftTrigger2));
+    if !skating || aiming || menu.0 {
+        state.carry = 0.0;
+        return;
+    }
+    out.pad_look = [0.0; 2];
+    if !state.loaded {
+        state.loaded = true;
+        state.recognizer = load_recognizer();
+    }
+    let stick = pads
+        .iter()
+        .map(Gamepad::right_stick)
+        .find(|s| *s != Vec2::ZERO)
+        .unwrap_or(Vec2::ZERO);
+    let axis = |v: f32| if v.abs() < FLICK_DEADZONE { 0.0 } else { v };
+    // Skate 3's gesture space has y pointing down.
+    let sample = [axis(stick.x), -axis(stick.y)];
+    state.carry += time.delta_secs() * FLICK_HZ;
+    while state.carry >= 1.0 {
+        state.carry -= 1.0;
+        let Some(recognizer) = state.recognizer.as_mut() else {
+            return;
+        };
+        let Some(hit) = recognizer.sample(sample, skate_input::Settings::STOCK) else {
+            continue;
+        };
+        let name = recognizer.patterns()[hit.pattern].name.clone();
+        let Some(id) = movement_iw4::skate_trick_id(&name) else {
+            continue;
+        };
+        diag::info!(Console, "flick-it: {name} strength {:.2}", hit.strength);
+        fire(&mut state, &mut out, id, (hit.strength * 255.0) as u8, now);
+    }
+}
+
+/// `trick <name> [strength 0..1]`: fire a flip trick as if flicked, for
+/// keyboards and scripts.
+pub(crate) fn route_trick_commands(
+    mut events: MessageReader<crate::ConsoleCommand>,
+    mut state: ResMut<FlickIt>,
+    mut console: ResMut<crate::ConsoleState>,
+    settings: Res<crate::ConsoleSettings>,
+) {
+    for cmd in events.read() {
+        if cmd.name != "trick" {
+            continue;
+        }
+        let names = || {
+            movement_iw4::SKATE_TRICKS
+                .iter()
+                .map(|t| t.name)
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
+        let found = cmd.args.first().and_then(|wanted| {
+            movement_iw4::SKATE_TRICKS
+                .iter()
+                .position(|t| t.name.eq_ignore_ascii_case(wanted))
+        });
+        let msg = match found {
+            Some(index) => {
+                let strength = cmd
+                    .args
+                    .get(1)
+                    .and_then(|s| s.parse::<f32>().ok())
+                    .unwrap_or(1.0)
+                    .clamp(0.0, 1.0);
+                let id = u8::try_from(index + 1).unwrap_or(0);
+                state.queued = Some((id, (strength * 255.0) as u8));
+                format!(
+                    "trick {} (strength {strength:.2})",
+                    movement_iw4::SKATE_TRICKS[index].name
+                )
+            }
+            None => format!("usage: trick <name> [strength]; names: {}", names()),
+        };
+        diag::info!(Console, "{msg}");
+        console.echo(msg, settings.log_capacity);
+    }
+}

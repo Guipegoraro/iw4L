@@ -90,9 +90,18 @@ Changes on top of upstream, newest last. Every change is recorded here.
 - **`IW4L_TIME_LIMIT`** sets the match time limit in minutes; `0` plays with
   no limit (e.g. `IW4L_TIME_LIMIT=0` in `.env`). `IW4L_SCORE_LIMIT` already
   existed.
-- **Skate 3 flick-it recogniser** (`crates/skate_input`): turns right-stick
-  paths into tricks using Skate 3's own gesture files (`skater.pat`, loaded
-  from the player's extraction). Not wired into the game yet.
+- **Flick-it tricks.** While skating, the pad's right stick does tricks the
+  Skate 3 way (holding LT gives it back for aiming): flick down-then-up to
+  ollie, and the other Skate 3 gestures for kickflip, heelflip, shuvits,
+  varials, hardflip, inward heel, 360 flip, laser flip and their 360 and
+  nollie versions. A faster flick pops higher. The board must come round
+  before you land or you bail; a half shuv lands you switch. The gestures
+  come from Skate 3's own `skater.pat`: set `IW4L_SKATE3_DATA` in `.env` to
+  the folder holding `data/joystick/skater.pat` (extracted from your disc).
+  Without a pad, `trick <name> [strength]` fires one. Recogniser:
+  `crates/skate_input`; trick table: `crates/movement_iw4/src/skate_tricks.rs`;
+  the trick rides in `UserCmd::skate_trick` so the sim stays deterministic.
+  The board is not drawn yet, so tricks show only as pops and catches.
 - **Windows test runs.** `cargo run -p approved_tests -- heavy_gameplay_lifecycle`
   works on Windows (junction for the shared cache, `iw4l.exe`, newest log when
   there is no `latest.log`). `IW4L_KEEP_CWD=1` stops the launcher moving into

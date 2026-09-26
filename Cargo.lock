@@ -2294,6 +2294,7 @@ dependencies = [
  "hud",
  "input_iw4",
  "math_iw4",
+ "movement_iw4",
  "net",
  "perf",
  "playerstate_iw4",
@@ -2303,6 +2304,7 @@ dependencies = [
  "replay",
  "session",
  "sim",
+ "skate_input",
  "ui",
 ]
 

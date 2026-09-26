@@ -513,6 +513,7 @@ pub fn create_cmd(input: &CreateCmdInput) -> UserCmd {
         melee_charge_dist: 0,
         selected_location: [0; 3],
         remote_control: [0; 2],
+        skate_trick: [0; 3],
     }
 }
 

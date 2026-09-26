@@ -118,6 +118,11 @@ pub(crate) fn register_debug_move_commands(registry: &mut ConsoleRegistry) {
             registry.register(crate::CommandSpec::new(name).usage(usage));
         }
     }
+    if registry.resolve("trick").is_none() {
+        registry.register(crate::CommandSpec::new("trick").usage(
+            "trick <name> [strength 0..1] — pop a flip trick while skating (Kickflip, 360Flip, ...)",
+        ));
+    }
     if registry.resolve("timescale").is_none() {
         registry.register(
             crate::CommandSpec::new("timescale").usage(
@@ -903,8 +908,13 @@ fn format_motion(ps: &playerstate_iw4::PlayerState) -> String {
         sim::MoveMode::Normal => format!("speed={speed:.0}"),
         sim::MoveMode::Noclip => format!("speed={speed:.0} mode=noclip"),
         sim::MoveMode::Skate => format!(
-            "speed={speed:.0} vz={:.0} mode=skate board_yaw={:.0} pop={}ms bail={}ms",
-            ps.velocity[2], ps.skate_yaw, ps.skate_pop_ms, ps.skate_bail_ms
+            "speed={speed:.0} vz={:.0} mode=skate board_yaw={:.0} pop={}ms bail={}ms trick={} {}ms",
+            ps.velocity[2],
+            ps.skate_yaw,
+            ps.skate_pop_ms,
+            ps.skate_bail_ms,
+            movement_iw4::skate_trick(ps.skate_trick).map_or("-", |t| t.name),
+            ps.skate_trick_ms
         ),
     }
 }

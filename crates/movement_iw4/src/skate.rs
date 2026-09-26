@@ -178,6 +178,13 @@ pub fn pm_skate_move<C: CollisionBackend>(
     let steer = f32::from(cmd.rightmove) / 127.0;
     let throttle = f32::from(cmd.forwardmove) / 127.0;
 
+    // A flick-it trick arrives once per sequence change; a stale sequence
+    // (say after a respawn) only resyncs, because its id is cleared.
+    let [trick_seq, trick_id, trick_strength] = cmd.skate_trick;
+    let flicked = i32::from(trick_seq) != ps.skate_trick_seq
+        && crate::skate_trick(i32::from(trick_id)).is_some();
+    ps.skate_trick_seq = i32::from(trick_seq);
+
     if ps.skate_bail_ms > 0 {
         ps.skate_bail_ms = (ps.skate_bail_ms - pml.msec).max(0);
         ps.skate_pop_ms = 0;
@@ -203,6 +210,9 @@ pub fn pm_skate_move<C: CollisionBackend>(
 
     if pml.walking == 0 {
         ps.skate_pop_ms = 0;
+        if ps.skate_trick != 0 {
+            ps.skate_trick_ms = ps.skate_trick_ms.saturating_add(pml.msec);
+        }
         ps.skate_yaw = wrap_degrees(ps.skate_yaw - steer * tuning.air_spin_rate * dt);
         air_step(ps, pml, bounds, collision);
         return outcome;
@@ -253,8 +263,16 @@ pub fn pm_skate_move<C: CollisionBackend>(
         ps.velocity[i] = speed * along[i] + lateral[i] * slip;
     }
 
-    if !jump_held && jump_was_held && ps.skate_pop_ms > 0 {
-        let wound = ps.skate_pop_ms as f32 / tuning.ollie_windup_ms as f32;
+    let jump_released = !jump_held && jump_was_held && ps.skate_pop_ms > 0;
+    if flicked || jump_released {
+        // A flick's strength stands in for the wind-up.
+        let wound = if flicked {
+            f32::from(trick_strength) / 255.0
+        } else {
+            ps.skate_pop_ms as f32 / tuning.ollie_windup_ms as f32
+        };
+        ps.skate_trick = if flicked { i32::from(trick_id) } else { 0 };
+        ps.skate_trick_ms = 0;
         let height =
             tuning.ollie_min_height + (tuning.ollie_max_height - tuning.ollie_min_height) * wound;
         ps.skate_pop_ms = 0;
@@ -295,6 +313,20 @@ pub fn pm_skate_land(
     if ps.skate_bail_ms > 0 {
         return outcome;
     }
+    // A flip trick is caught only once the board has come round.
+    if let Some(trick) = crate::skate_trick(ps.skate_trick) {
+        let caught = ps.skate_trick_ms >= trick.rotation_ms();
+        ps.skate_trick = 0;
+        ps.skate_trick_ms = 0;
+        if !caught {
+            bail(ps, tuning);
+            outcome.bailed = true;
+            return outcome;
+        }
+        if trick.turns_board() {
+            ps.skate_yaw = wrap_degrees(ps.skate_yaw + 180.0);
+        }
+    }
     let heading = heading(ps.skate_yaw);
     let horizontal = [ps.velocity[0], ps.velocity[1]];
     let speed = libm::sqrtf(horizontal[0] * horizontal[0] + horizontal[1] * horizontal[1]);
@@ -318,6 +350,8 @@ pub fn pm_skate_land(
 fn bail(ps: &mut PlayerState, tuning: &SkateTuning) {
     ps.skate_bail_ms = tuning.bail_ms;
     ps.skate_pop_ms = 0;
+    ps.skate_trick = 0;
+    ps.skate_trick_ms = 0;
     ps.velocity[0] *= 0.3;
     ps.velocity[1] *= 0.3;
 }
