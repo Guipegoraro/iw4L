@@ -17,6 +17,9 @@ bevy-debug = ["bevy/debug", "bevy/track_location"]
 # on this feature is what turns "the interval across bevy's submit set was
 # long" into a statement about where the time went.
 bevy-trace = ["bevy/trace", "bevy/trace_chrome"]
+# Bevy Remote Protocol on 127.0.0.1:15702 (`BRP_EXTRAS_PORT` overrides), so an
+# agent can inspect and drive the live app through `bevy_brp_mcp`.
+brp = ["dep:bevy_brp_extras"]
 
 [dependencies]
 bevy.workspace = true
@@ -36,6 +39,7 @@ hud = { path = "../hud" }
 perf.workspace = true
 sha2.workspace = true
 serde_json.workspace = true
+bevy_brp_extras = { workspace = true, optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2"

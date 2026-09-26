@@ -10,6 +10,8 @@ name = "iw4l"
 path = "src/main.rs"
 
 [features]
+default = ["brp"]
+brp = ["bootstrap/brp"]
 bevy-debug = ["bootstrap/bevy-debug"]
 bevy-trace = ["bootstrap/bevy-trace"]
 

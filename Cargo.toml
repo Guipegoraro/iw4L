@@ -169,6 +169,9 @@ ui = { path = "crates/ui" }
 weapon_iw4 = { path = "crates/weapon_iw4" }
 xmodel_runtime = { path = "crates/xmodel_runtime" }
 glam = "0.32.1"
+# Bevy Remote Protocol server + extra methods (screenshot, input) for the
+# `bevy_brp_mcp` agent tools. Local dev only; see `bootstrap/brp`.
+bevy_brp_extras = "0.22.7"
 
 # Transcribing a retail constant at full precision is the requirement, not a
 # style slip. `clippy::excessive_precision` fired on
