@@ -515,6 +515,16 @@ fn default_pages() -> Vec<ModMenuPage> {
             .command_and_close("Skate on", "skate on")
             .command_and_close("Skate off (walk)", "skate off")
             .command("Third person on / off", "thirdperson"),
+        ModMenuPage::new("world", "WORLD")
+            .on_root("World")
+            .command("Moon gravity (100)", "gravity 100")
+            .command("Low gravity (400)", "gravity 400")
+            .command("Normal gravity (800)", "gravity 800")
+            .command("Heavy gravity (1600)", "gravity 1600")
+            .command("Fast (speed 380)", "speed 380")
+            .command("Normal speed (190)", "speed 190")
+            .command("Slow motion (0.25x)", "timescale 0.25")
+            .command("Normal time", "timescale 1"),
         // Filled once a match prepares its weapons.
         ModMenuPage::new("weapons", "GIVE WEAPON").on_root("Weapons"),
         ModMenuPage::new("bots", "BOTS")

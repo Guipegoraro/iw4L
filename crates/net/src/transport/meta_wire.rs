@@ -482,6 +482,16 @@ pub(crate) fn encode_action(out: &mut WireWriter, action: &ClientAction) {
             out.put_u32(request_id);
             out.put_u32(mode);
         }
+        ClientAction::SetTuning {
+            request_id,
+            key,
+            value,
+        } => {
+            out.put_u8(19);
+            out.put_u32(request_id);
+            out.put_u8(key as u8);
+            out.put_i32(value);
+        }
         ClientAction::SetCheat {
             request_id,
             cheat,
@@ -593,6 +603,12 @@ pub(crate) fn decode_action(input: &mut WireReader<'_>) -> Result<ClientAction, 
         17 => Ok(ClientAction::SetMoveMode {
             request_id: input.get_u32()?,
             mode: input.get_u32()?,
+        }),
+        19 => Ok(ClientAction::SetTuning {
+            request_id: input.get_u32()?,
+            key: sim::tuning::TuningKey::from_u8(input.get_u8()?)
+                .ok_or(WireError::Malformed("unknown tuning key"))?,
+            value: input.get_i32()?,
         }),
         18 => Ok(ClientAction::SetCheat {
             request_id: input.get_u32()?,

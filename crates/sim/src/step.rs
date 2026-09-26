@@ -1259,6 +1259,26 @@ fn apply_actions(world: &mut FrameWorld, tick: Tick, actions: &[(ClientId, Clien
                 request_id: _,
                 mode,
             } => apply_set_move_mode(world, *id, mode),
+            ClientAction::SetTuning {
+                request_id: _,
+                key,
+                value,
+            } => {
+                if world.bootstrap_ref().allow_debug_actions {
+                    world.tuning_mut().set(key, value);
+                    let tuning = world.tuning();
+                    let alive: Vec<ClientId> = world
+                        .clients_scoreboard()
+                        .iter()
+                        .map(|(client, _)| *client)
+                        .collect();
+                    for client in alive {
+                        if let Some(ps) = world.player_mut(client) {
+                            tuning.apply(ps);
+                        }
+                    }
+                }
+            }
             ClientAction::SetCheat {
                 request_id: _,
                 cheat,
@@ -2438,6 +2458,7 @@ fn resolve_pending_spawns(world: &mut FrameWorld, tick: Tick) {
         let class_id = loadout.class_id;
 
         let mut ps = spawn_player_state(decision.traced_origin, decision.raw_angles);
+        world.tuning().apply(&mut ps);
         ps.action_slot_type[1] = 2;
         if let Some(cmd) = world.old_cmd_angles(id) {
             ps.delta_angles = std::array::from_fn(|axis| {

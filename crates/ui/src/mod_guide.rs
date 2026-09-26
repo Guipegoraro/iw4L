@@ -215,6 +215,7 @@ fn default_topics() -> Vec<ModGuideTopic> {
             .line("heal  -  restore your health")
             .line("god [on|off]  -  take no damage")
             .line("timescale [0.05..4]  -  slow motion / fast-forward (1 = normal)")
+            .line("gravity [n] / speed [n]  -  world gravity (800) and move speed (190)")
             .line("noclip [on|off]  -  fly through walls: jump up, crouch down, sprint fast")
             .line("modmenu [pause|live|close]  -  open or close the mod menu")
             .line("")

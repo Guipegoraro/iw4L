@@ -88,6 +88,22 @@ pub(crate) fn register_debug_move_commands(registry: &mut ConsoleRegistry) {
             "movemode [normal|skate|noclip] — show or switch the movement mode (needs cheats; invented)",
         ));
     }
+    for (name, usage) in [
+        (
+            "gravity",
+            "gravity [value] — match gravity, default 800 (needs cheats)",
+        ),
+        ("g_gravity", "g_gravity [value] — same as gravity"),
+        (
+            "speed",
+            "speed [value] — player move speed, default 190 (needs cheats)",
+        ),
+        ("g_speed", "g_speed [value] — same as speed"),
+    ] {
+        if registry.resolve(name).is_none() {
+            registry.register(crate::CommandSpec::new(name).usage(usage));
+        }
+    }
     if registry.resolve("timescale").is_none() {
         registry.register(
             crate::CommandSpec::new("timescale").usage(
@@ -471,6 +487,41 @@ pub(crate) fn route_debug_move_commands(
                         format!("{queued} {switch:?}")
                     }
                     None => format!("usage: {name} [on|off]"),
+                };
+                echo(msg, &mut console, &mut line);
+            }
+            "gravity" | "g_gravity" | "speed" | "g_speed" => {
+                let key = if cmd.name.ends_with("gravity") {
+                    sim::tuning::TuningKey::Gravity
+                } else {
+                    sim::tuning::TuningKey::Speed
+                };
+                let current = presented.alive_player(local.0).map(|ps| match key {
+                    sim::tuning::TuningKey::Gravity => ps.gravity,
+                    sim::tuning::TuningKey::Speed => ps.speed,
+                });
+                let msg = match cmd.args.first().map(|a| a.parse::<i32>()) {
+                    None => format!(
+                        "{}: {}",
+                        cmd.name,
+                        current.map_or_else(|| "(not Alive)".to_owned(), |v| v.to_string())
+                    ),
+                    Some(Ok(value)) => {
+                        let mut gate = CheatQueue {
+                            presented: &presented,
+                            local: local.0,
+                            authority: authority.as_deref(),
+                            inbox: inbox.as_deref_mut(),
+                            seq: &mut seq,
+                        };
+                        let queued = gate.queue(&cmd.name, |request_id| ClientAction::SetTuning {
+                            request_id,
+                            key,
+                            value,
+                        });
+                        format!("{queued} value={value}")
+                    }
+                    Some(Err(_)) => format!("usage: {} [value]", cmd.name),
                 };
                 echo(msg, &mut console, &mut line);
             }

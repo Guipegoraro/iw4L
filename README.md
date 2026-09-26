@@ -45,6 +45,10 @@ Changes on top of upstream, newest last. Every change is recorded here.
 - **`timescale [0.05..4]`** slows or speeds the whole game (1 = normal; mod
   menu: Match has 0.25x, 0.5x, 1x, 2x). It scales the clock that drives the
   fixed tick, so every tick stays identical; only the match host can use it.
+- **`gravity [n]` / `speed [n]`** (also `g_gravity` / `g_speed`) set the
+  match's gravity (default 800) and move speed (190) for every player, live
+  and for later spawns (`crates/sim/src/tuning.rs`). Mod menu: World page,
+  with presets.
 - **`noclip [on|off]`** flies through walls along the view: jump rises,
   crouch sinks, sprint doubles the speed (mod menu: Player). It is a movement
   mode like skate (`crates/movement_iw4/src/noclip.rs`).

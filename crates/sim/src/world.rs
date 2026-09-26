@@ -418,6 +418,7 @@ pub struct SimState {
     match_elapsed_ms: u32,
 
     prematch: gamemode_iw4::PrematchStep,
+    tuning: crate::tuning::MatchTuning,
 
     max_alive_seen: u32,
 
@@ -589,6 +590,7 @@ impl Default for SimState {
             phase: MatchPhase::Warmup,
             match_elapsed_ms: 0,
             prematch: gamemode_iw4::PrematchStep::default(),
+            tuning: crate::tuning::MatchTuning::default(),
             max_alive_seen: 0,
             pending_prematch_done: false,
             pending_game_win: None,
@@ -836,6 +838,14 @@ impl SimState {
         if n > self.max_alive_seen {
             self.max_alive_seen = n;
         }
+    }
+
+    pub fn tuning(&self) -> crate::tuning::MatchTuning {
+        self.tuning
+    }
+
+    pub(crate) fn tuning_mut(&mut self) -> &mut crate::tuning::MatchTuning {
+        &mut self.tuning
     }
 
     pub(crate) fn set_prematch(&mut self, step: gamemode_iw4::PrematchStep) {

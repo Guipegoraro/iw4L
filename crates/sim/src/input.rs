@@ -85,6 +85,13 @@ pub enum ClientAction {
         switch: crate::cheat::Switch,
     },
 
+    /// Set a match-wide tuning value (gravity, speed); host cheats only.
+    SetTuning {
+        request_id: ActionRequestId,
+        key: crate::tuning::TuningKey,
+        value: i32,
+    },
+
     /// Switch an Alive player's movement mode (`MoveMode as u32`); cheats only.
     SetMoveMode {
         request_id: ActionRequestId,
@@ -147,6 +154,7 @@ pub fn action_request_id(action: &ClientAction) -> ActionRequestId {
         | ClientAction::DebugHeal { request_id }
         | ClientAction::SetMoveMode { request_id, .. }
         | ClientAction::SetCheat { request_id, .. }
+        | ClientAction::SetTuning { request_id, .. }
         | ClientAction::SetName { request_id, .. }
         | ClientAction::UseCopycat { request_id } => request_id,
     }

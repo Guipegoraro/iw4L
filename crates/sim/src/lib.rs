@@ -118,6 +118,7 @@ pub use identities::{
 pub use input::{ActionRequestId, ClassId, ClientAction, SpawnPick, TickInput, action_request_id};
 pub use mantle_xanim::MantleXAnimBind;
 pub use movement_iw4::MoveMode;
+pub mod tuning;
 
 /// IW4L cheat toggles, kept per player in `ClientMatchState::cheats`. A new
 /// cheat is a bit here, a check where it bites, and a console name.
