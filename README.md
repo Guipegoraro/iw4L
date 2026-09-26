@@ -39,6 +39,9 @@ Changes on top of upstream, newest last. Every change is recorded here.
   [pause|live|close]`. Other code adds pages as data with
   `app.add_mod_menu_page(..)` (`crates/ui/src/mod_menu.rs`).
 - **`heal`** restores the local player's health (cheats; on in local matches).
+- **`noclip [on|off]`** flies through walls along the view: jump rises,
+  crouch sinks, sprint doubles the speed (mod menu: Player). It is a movement
+  mode like skate (`crates/movement_iw4/src/noclip.rs`).
 - **Skateboard mode.** `skate [on|off]` (or `movemode <normal|skate>`, or the
   mod menu's Skate page). W pushes, S brakes, A/D carve, holding jump winds up
   an ollie that pops on release, A/D in the air spins the board. A landing

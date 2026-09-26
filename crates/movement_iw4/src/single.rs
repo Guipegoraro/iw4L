@@ -128,18 +128,26 @@ pub fn pm_move<C: CollisionBackend, L: MantleXAnimLength, R: MantleRootDelta>(
         return PmoveResult { pml, bounds };
     }
 
-    if MoveMode::of(ps) == MoveMode::Skate {
-        // Skate replaces mantle, ladder, walk and air: the board owns the body.
-        pm_skate_tick(
-            ps,
-            &mut pml,
-            cmd,
-            context.old_buttons,
-            &SkateTuning::DEFAULT,
-            bounds,
-            collision,
-        );
-        return PmoveResult { pml, bounds };
+    match MoveMode::of(ps) {
+        MoveMode::Normal => {}
+        MoveMode::Skate => {
+            // Skate replaces mantle, ladder, walk and air: the board owns the body.
+            pm_skate_tick(
+                ps,
+                &mut pml,
+                cmd,
+                context.old_buttons,
+                &SkateTuning::DEFAULT,
+                bounds,
+                collision,
+            );
+            return PmoveResult { pml, bounds };
+        }
+        MoveMode::Noclip => {
+            pm_drop_timers(ps, &pml);
+            crate::pm_noclip_move(ps, &pml, cmd);
+            return PmoveResult { pml, bounds };
+        }
     }
 
     complete_ground_trace(ps, &mut pml, bounds, collision);

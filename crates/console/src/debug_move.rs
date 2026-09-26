@@ -85,8 +85,14 @@ pub(crate) fn register_debug_move_commands(registry: &mut ConsoleRegistry) {
     }
     if registry.resolve("movemode").is_none() {
         registry.register(crate::CommandSpec::new("movemode").usage(
-            "movemode [normal|skate] — show or switch the movement mode (needs cheats; invented)",
+            "movemode [normal|skate|noclip] — show or switch the movement mode (needs cheats; invented)",
         ));
+    }
+    if registry.resolve("noclip").is_none() {
+        registry.register(
+            crate::CommandSpec::new("noclip")
+                .usage("noclip [on|off] — fly through walls; jump rises, crouch sinks, sprint doubles (needs cheats; invented)"),
+        );
     }
     if registry.resolve("skate").is_none() {
         registry.register(
@@ -424,23 +430,26 @@ pub(crate) fn route_debug_move_commands(
                 let msg = cheat.queue("heal", |request_id| ClientAction::DebugHeal { request_id });
                 echo(msg, &mut console, &mut line);
             }
-            "movemode" | "skate" => {
+            "movemode" | "skate" | "noclip" => {
                 let current = presented.alive_player(local.0).map(sim::MoveMode::of);
                 let wanted = match (cmd.name.as_str(), cmd.args.first().map(String::as_str)) {
-                    ("skate", None) => Ok(if current == Some(sim::MoveMode::Skate) {
-                        sim::MoveMode::Normal
-                    } else {
-                        sim::MoveMode::Skate
-                    }),
-                    ("skate", Some("on" | "1")) => Ok(sim::MoveMode::Skate),
-                    ("skate", Some("off" | "0")) => Ok(sim::MoveMode::Normal),
                     ("movemode", None) => Err(format!(
                         "movemode: {}",
                         current.map_or("(not Alive)", sim::MoveMode::name)
                     )),
                     ("movemode", Some(name)) => sim::MoveMode::from_name(name)
                         .ok_or_else(|| format!("movemode: unknown mode {name:?}")),
-                    _ => Err(format!("usage: {}", cmd.name)),
+                    // A mode's own name toggles it: `skate`, `noclip`.
+                    (name, arg) => match (sim::MoveMode::from_name(name), arg) {
+                        (Some(mode), None) => Ok(if current == Some(mode) {
+                            sim::MoveMode::Normal
+                        } else {
+                            mode
+                        }),
+                        (Some(mode), Some("on" | "1")) => Ok(mode),
+                        (Some(_), Some("off" | "0")) => Ok(sim::MoveMode::Normal),
+                        _ => Err(format!("usage: {name} [on|off]")),
+                    },
                 };
                 let msg = match wanted {
                     Ok(mode) => {
@@ -783,6 +792,7 @@ fn format_motion(ps: &playerstate_iw4::PlayerState) -> String {
     let mode = sim::MoveMode::of(ps);
     match mode {
         sim::MoveMode::Normal => format!("speed={speed:.0}"),
+        sim::MoveMode::Noclip => format!("speed={speed:.0} mode=noclip"),
         sim::MoveMode::Skate => format!(
             "speed={speed:.0} vz={:.0} mode=skate board_yaw={:.0} pop={}ms bail={}ms",
             ps.velocity[2], ps.skate_yaw, ps.skate_pop_ms, ps.skate_bail_ms

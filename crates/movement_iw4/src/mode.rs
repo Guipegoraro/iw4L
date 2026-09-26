@@ -13,10 +13,11 @@ pub enum MoveMode {
     #[default]
     Normal = 0,
     Skate = 1,
+    Noclip = 2,
 }
 
 impl MoveMode {
-    pub const ALL: [Self; 2] = [Self::Normal, Self::Skate];
+    pub const ALL: [Self; 3] = [Self::Normal, Self::Skate, Self::Noclip];
 
     pub fn of(ps: &PlayerState) -> Self {
         Self::ALL
@@ -29,6 +30,7 @@ impl MoveMode {
         match self {
             Self::Normal => "normal",
             Self::Skate => "skate",
+            Self::Noclip => "noclip",
         }
     }
 

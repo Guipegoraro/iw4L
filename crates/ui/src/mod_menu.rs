@@ -501,6 +501,7 @@ fn default_pages() -> Vec<ModMenuPage> {
             .command("Respawn at a random spawn", "force_spawn")
             .command("Kill yourself", "kill")
             .command("Heal", "heal")
+            .command_and_close("Noclip on / off", "noclip")
             .command("Take 40 damage", "damage 40")
             .command("Show position", "showpos on")
             .command("Hide position", "showpos off"),

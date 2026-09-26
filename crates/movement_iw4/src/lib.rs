@@ -23,6 +23,7 @@ mod ladder;
 mod mantle;
 mod melee_charge;
 mod mode;
+mod noclip;
 mod pml;
 mod pmove;
 mod single;
@@ -98,6 +99,7 @@ pub use melee_charge::{
     pm_calc_melee_charge_time, pm_melee_charge_clear, pm_melee_charge_move,
 };
 pub use mode::{MoveMode, pm_set_move_mode};
+pub use noclip::{NOCLIP_SPEED, pm_noclip_move};
 pub use pml::Pml;
 pub use pmove::Pmove;
 pub use single::{
