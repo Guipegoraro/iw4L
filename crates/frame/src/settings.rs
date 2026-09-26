@@ -33,6 +33,8 @@ pub struct GameSettings {
     pub sensitivity: f32,
     pub invert_mouse: bool,
     pub player_name: String,
+    /// Third-person camera (`cg_thirdperson`).
+    pub third_person: bool,
 
     pub revision: u64,
 }
@@ -48,6 +50,7 @@ impl Default for GameSettings {
             sensitivity: 5.0,
             invert_mouse: false,
             player_name: "Player".to_owned(),
+            third_person: false,
             revision: 0,
         }
     }

@@ -507,7 +507,8 @@ fn default_pages() -> Vec<ModMenuPage> {
         ModMenuPage::new("skate", "SKATE")
             .on_root("Skate")
             .command_and_close("Skate on", "skate on")
-            .command_and_close("Skate off (walk)", "skate off"),
+            .command_and_close("Skate off (walk)", "skate off")
+            .command("Third person on / off", "thirdperson"),
         // Filled once a match prepares its weapons.
         ModMenuPage::new("weapons", "GIVE WEAPON").on_root("Weapons"),
         ModMenuPage::new("bots", "BOTS")
@@ -520,6 +521,7 @@ fn default_pages() -> Vec<ModMenuPage> {
             .command("All bots fire", "bot fire all"),
         ModMenuPage::new("visuals", "VISUALS")
             .on_root("Visuals")
+            .command("Third person on / off", "thirdperson")
             .command("Fullbright on", "r_fullbright 1")
             .command("Fullbright off", "r_fullbright 0")
             .command("Shadows on", "sm_enable 1")

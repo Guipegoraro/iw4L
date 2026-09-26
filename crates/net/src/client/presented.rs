@@ -57,9 +57,20 @@ pub struct PresentedSnapshot {
     remote_provenance: HashMap<ClientId, PresentationSampleProvenance>,
 
     presented_projectiles: Vec<PresentedProjectile>,
+
+    /// The viewer's `cg_thirdperson` preference; outlives snapshots and `clear`.
+    cg_third_person: bool,
 }
 
 impl PresentedSnapshot {
+    pub fn cg_third_person(&self) -> bool {
+        self.cg_third_person
+    }
+
+    pub fn set_cg_third_person(&mut self, on: bool) {
+        self.cg_third_person = on;
+    }
+
     pub fn clear(&mut self) {
         self.inner = None;
         self.previous_inner = None;

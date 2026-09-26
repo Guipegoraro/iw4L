@@ -302,6 +302,14 @@ impl Plugin for ConsolePlugin {
             .add_message::<ConsoleCommand>()
             .add_systems(Update, apply_ingame_menu_intents.after(ClientSet::Ui))
             .add_systems(
+                Update,
+                (
+                    crate::user_settings::route_view_commands,
+                    crate::user_settings::sync_third_person_view,
+                )
+                    .chain(),
+            )
+            .add_systems(
                 Startup,
                 (setup_console, crate::user_settings::load_user_settings).chain(),
             )

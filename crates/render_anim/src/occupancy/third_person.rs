@@ -29,7 +29,7 @@ pub fn presented_is_third_person(
         pm_type: ps.pm_type,
         other_flags: ps.other_flags,
         link_flags: ps.link_flags,
-        cg_third_person: false,
+        cg_third_person: presented.cg_third_person(),
         in_killcam,
         killcam_mode: KillCamMode::Mode0,
     })

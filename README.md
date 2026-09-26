@@ -63,6 +63,10 @@ Changes on top of upstream, newest last. Every change is recorded here.
 
   In a menu the D-pad moves, A picks and B goes back. Settings files saved
   before gamepad support get these binds once on load.
+- **`thirdperson [on|off]`** (also in the mod menu's Skate and Visuals pages,
+  saved with the settings) moves the camera behind the player with the
+  retail third-person camera. Work in progress: the player's own body is not
+  drawn yet.
 - **Mod guide.** The pause menu (Esc) has a **Mod Guide** entry: how to use
   every addition, one page per topic. A feature adds its own page with
   `app.add_mod_guide_topic(..)` (`crates/ui/src/mod_guide.rs`).

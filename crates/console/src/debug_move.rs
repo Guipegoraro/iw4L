@@ -77,6 +77,12 @@ pub(crate) fn register_debug_move_commands(registry: &mut ConsoleRegistry) {
                 .usage("heal — restore Alive health to max (needs cheats; invented)"),
         );
     }
+    if registry.resolve("thirdperson").is_none() {
+        registry.register(
+            crate::CommandSpec::new("thirdperson")
+                .usage("thirdperson [on|off] — third-person camera; toggles when bare (saved)"),
+        );
+    }
     if registry.resolve("movemode").is_none() {
         registry.register(crate::CommandSpec::new("movemode").usage(
             "movemode [normal|skate] — show or switch the movement mode (needs cheats; invented)",

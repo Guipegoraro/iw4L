@@ -231,6 +231,7 @@ fn serialize_settings(settings: &frame::GameSettings, binds: &KeyBinds) -> Strin
         format!("sensitivity={:.3}", settings.sensitivity),
         format!("invert_mouse={}", settings.invert_mouse),
         format!("player_name={safe_name}"),
+        format!("third_person={}", settings.third_person),
         "unbindall".to_owned(),
     ];
     lines.extend(binds.list_lines());
@@ -293,6 +294,11 @@ fn parse_settings(source: &str, settings: &mut frame::GameSettings, binds: &mut 
                 }
             }
             "player_name" => settings.player_name = value.to_owned(),
+            "third_person" => {
+                if let Ok(value) = value.parse() {
+                    settings.third_person = value;
+                }
+            }
             _ => warn!("ignored unknown setting `{key}`"),
         }
     }
@@ -332,5 +338,48 @@ fn parse_settings(source: &str, settings: &mut frame::GameSettings, binds: &mut 
             })
             .collect();
         let _ = binds.apply_config_script(&pad_defaults);
+    }
+}
+
+/// `thirdperson [on|off]` (or `cg_thirdperson`): toggles when bare. Saved
+/// with the other settings.
+pub(crate) fn route_view_commands(
+    mut events: MessageReader<crate::ConsoleCommand>,
+    mut settings: ResMut<frame::GameSettings>,
+    mut console: ResMut<crate::ConsoleState>,
+    console_settings: Res<crate::ConsoleSettings>,
+) {
+    for cmd in events.read() {
+        if !matches!(cmd.name.as_str(), "thirdperson" | "cg_thirdperson") {
+            continue;
+        }
+        let on = match cmd.args.first().map(String::as_str) {
+            None => !settings.third_person,
+            Some("on" | "1") => true,
+            Some("off" | "0") => false,
+            Some(other) => {
+                console.echo(
+                    format!("usage: thirdperson [on|off] (got `{other}`)"),
+                    console_settings.log_capacity,
+                );
+                continue;
+            }
+        };
+        settings.third_person = on;
+        settings.touch();
+        let msg = format!("thirdperson {}", if on { "on" } else { "off" });
+        diag::info!(Console, "{msg}");
+        console.echo(msg, console_settings.log_capacity);
+    }
+}
+
+/// Hand the preference to the presented view, which every first/third-person
+/// decision reads.
+pub(crate) fn sync_third_person_view(
+    settings: Res<frame::GameSettings>,
+    mut presented: ResMut<net::PresentedSnapshot>,
+) {
+    if presented.cg_third_person() != settings.third_person {
+        presented.set_cg_third_person(settings.third_person);
     }
 }
