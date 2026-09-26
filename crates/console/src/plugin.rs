@@ -306,12 +306,14 @@ impl Plugin for ConsolePlugin {
                 (setup_console, crate::user_settings::load_user_settings).chain(),
             )
             .add_systems(PreUpdate, feed_console_keyboard.before(InputSystems))
+            .add_systems(Update, crate::gamepad::log_pad_connections)
             .add_systems(
                 PreUpdate,
                 (
                     handle_console_input,
                     handle_scrollback_pointer,
                     copy_console_selection_on_release,
+                    crate::gamepad::pad_menu_keys,
                     isolate_gameplay_input,
                     expire_pressed_inputs,
                     publish_client_action_input,
@@ -418,6 +420,7 @@ fn publish_client_action_input(
     time: Res<Time>,
     keys: Res<ButtonInput<KeyCode>>,
     mouse_buttons: Res<ButtonInput<MouseButton>>,
+    pads: Query<&bevy::input::gamepad::Gamepad>,
     mut motion: MessageReader<MouseMotion>,
     binds: Res<KeyBinds>,
     mut scripted: ResMut<ConsoleInputState>,
@@ -451,6 +454,8 @@ fn publish_client_action_input(
     }
     out.mouse_x = 0.0;
     out.mouse_y = 0.0;
+    out.pad_move = [0.0; 2];
+    out.pad_look = [0.0; 2];
     out.frame_msec = key_frame_msec(time.delta_secs());
     out.now_msec = com_frame_time_msec(time.elapsed_secs());
     out.sensitivity = settings.sensitivity;
@@ -475,7 +480,7 @@ fn publish_client_action_input(
         return;
     }
 
-    let inputs = BindInputs::new(&keys, &mouse_buttons);
+    let inputs = BindInputs::new(&keys, &mouse_buttons, pads.iter());
     for (button, id) in binds.iter() {
         let key_num = host_keynum(button);
         if key_num >= input_iw4::KEY_COUNT {
@@ -520,6 +525,13 @@ fn publish_client_action_input(
         out.mouse_x += ev.delta.x;
         out.mouse_y += ev.delta.y;
     }
+    out.pad_move = crate::gamepad::pad_move(pads.iter());
+    out.pad_look = crate::gamepad::pad_look(
+        pads.iter(),
+        time.delta_secs(),
+        out.fov_scale * out.shellshock_look_scale,
+        settings.invert_mouse,
+    );
 }
 
 /// Hold the pointer for as long as gameplay owns it, and take it back whenever

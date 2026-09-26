@@ -47,6 +47,7 @@ pub(crate) fn consume_menu_binding(
     mut intents: MessageReader<ui::UiIntent>,
     keys: Res<ButtonInput<KeyCode>>,
     mouse: Res<ButtonInput<MouseButton>>,
+    pads: Query<&bevy::input::gamepad::Gamepad>,
     mut pending: ResMut<PendingMenuBinding>,
     mut binds: ResMut<KeyBinds>,
     mut view: ResMut<ui::BindingView>,
@@ -81,6 +82,12 @@ pub(crate) fn consume_menu_binding(
                 .get_just_pressed()
                 .copied()
                 .map(BindButton::Mouse)
+                .next()
+        })
+        .or_else(|| {
+            pads.iter()
+                .flat_map(|pad| pad.get_just_pressed().copied())
+                .map(BindButton::Pad)
                 .next()
         });
     let Some(button) = button else { return };
@@ -212,7 +219,7 @@ fn settings_path(artifacts: &std::path::Path) -> Option<PathBuf> {
 fn serialize_settings(settings: &frame::GameSettings, binds: &KeyBinds) -> String {
     let safe_name = settings.player_name.replace(['\n', '\r', '='], " ");
     let mut lines = vec![
-        "// IW4L user settings v2".to_owned(),
+        "// IW4L user settings v3".to_owned(),
         format!(
             "resolution={}x{}",
             settings.resolution.width, settings.resolution.height
@@ -303,5 +310,27 @@ fn parse_settings(source: &str, settings: &mut frame::GameSettings, binds: &mut 
         && !binds.iter().any(|(_, id)| id == 21)
     {
         binds.set(BindButton::Key(KeyCode::Digit4), 21);
+    }
+    // v3 added gamepad binds; files saved before them start with `unbindall`.
+    if source.lines().next().is_some_and(|line| {
+        matches!(
+            line.trim(),
+            "// IW4L user settings v1" | "// IW4L user settings v2"
+        )
+    }) && !binds
+        .iter()
+        .any(|(button, _)| matches!(button, BindButton::Pad(_)))
+    {
+        let pad_defaults: String = crate::binds::DEFAULT_CONTROLS
+            .lines()
+            .filter(|line| line.contains("BUTTON_") || line.contains("DPAD_"))
+            .map(|line| {
+                format!(
+                    "{line}
+"
+                )
+            })
+            .collect();
+        let _ = binds.apply_config_script(&pad_defaults);
     }
 }

@@ -25,6 +25,48 @@ The network side is for arranged playtests among people who already agreed to
 play; it has never been vetted for lobbies full of strangers. IW4L sends nothing
 home, and diagnostic files sit on your disk until you attach them to a report.
 
+## This fork
+
+Changes on top of upstream, newest last. Every change is recorded here.
+
+- **Remote control (BRP).** The `brp` launcher feature (on by default) serves
+  the Bevy Remote Protocol on `127.0.0.1:15702`: query and change the live
+  game, take screenshots, send keys. `BRP_EXTRAS_PORT` moves it.
+- **Mod menu.** In a match, **F5** opens it and pauses, **F6** opens it with
+  the game running; **F2** works as Esc. Pages: match, player, skate, weapons
+  (every giveable gun), bots, visuals, capture, maps. Each entry runs a
+  console command, so nothing has to be typed. Console: `modmenu
+  [pause|live|close]`. Other code adds pages as data with
+  `app.add_mod_menu_page(..)` (`crates/ui/src/mod_menu.rs`).
+- **`heal`** restores the local player's health (cheats; on in local matches).
+- **Skateboard mode.** `skate [on|off]` (or `movemode <normal|skate>`, or the
+  mod menu's Skate page). W pushes, S brakes, A/D carve, holding jump winds up
+  an ollie that pops on release, A/D in the air spins the board. A landing
+  across the board, a hard impact or a wall bails. The view stays free.
+  `showpos on` shows ground speed and the board state. Movement modes are a
+  hook in `pm_move` (`crates/movement_iw4/src/mode.rs`); skate lives in
+  `skate.rs` with its knobs in `SkateTuning`.
+- **Gamepad.** XInput pads (an 8BitDo in XInput mode shows up as an Xbox 360
+  controller). Left stick moves (analog: carve depth when skating), right
+  stick looks. Buttons are ordinary binds (`bind BUTTON_A +gostand`), console
+  MW2 layout by default:
+
+  | button | action | button | action |
+  | --- | --- | --- | --- |
+  | A | jump / ollie | RT | fire |
+  | B | crouch / prone | LT | aim |
+  | X | use / reload | RB | lethal |
+  | Y | switch weapon | LB | tactical |
+  | L3 | sprint | R3 | melee |
+  | D-pad | action slots 1–4 | Start / Back | mod menu / pause menu |
+
+  In a menu the D-pad moves, A picks and B goes back. Settings files saved
+  before gamepad support get these binds once on load.
+- **Windows test runs.** `cargo run -p approved_tests -- heavy_gameplay_lifecycle`
+  works on Windows (junction for the shared cache, `iw4l.exe`, newest log when
+  there is no `latest.log`). `IW4L_KEEP_CWD=1` stops the launcher moving into
+  its own folder.
+
 ## Architecture
 
 | | |

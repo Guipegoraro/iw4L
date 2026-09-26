@@ -19,6 +19,7 @@ mod debug_vision;
 mod diagnostics;
 pub mod editor;
 mod feature_dispatch;
+mod gamepad;
 pub mod input;
 pub mod plugin;
 pub mod registry;

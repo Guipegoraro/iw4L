@@ -3,6 +3,7 @@ use input_iw4::{command_id_lookup, command_name};
 use std::collections::HashMap;
 
 use bevy::input::ButtonInput;
+use bevy::input::gamepad::{Gamepad, GamepadButton};
 use bevy::input::keyboard::KeyCode;
 use bevy::input::mouse::MouseButton;
 use bevy::prelude::Resource;
@@ -73,28 +74,81 @@ pub const BINDABLE_KEYS: &[&str] = &[
     "mouse3",
     "mouse4",
     "mouse5",
+    "button_a",
+    "button_b",
+    "button_x",
+    "button_y",
+    "button_lshldr",
+    "button_rshldr",
+    "button_ltrig",
+    "button_rtrig",
+    "button_lstick",
+    "button_rstick",
+    "button_start",
+    "button_back",
+    "dpad_up",
+    "dpad_down",
+    "dpad_left",
+    "dpad_right",
 ];
+
+/// Gamepad buttons by their retail console-key names, Xbox layout (an 8BitDo
+/// in XInput mode reports the same), and the host key number each one drives.
+pub const PAD_BUTTONS: &[(&str, GamepadButton, usize)] = &[
+    ("BUTTON_A", GamepadButton::South, 190),
+    ("BUTTON_B", GamepadButton::East, 191),
+    ("BUTTON_X", GamepadButton::West, 192),
+    ("BUTTON_Y", GamepadButton::North, 193),
+    ("BUTTON_LSHLDR", GamepadButton::LeftTrigger, 194),
+    ("BUTTON_RSHLDR", GamepadButton::RightTrigger, 195),
+    ("BUTTON_LTRIG", GamepadButton::LeftTrigger2, 196),
+    ("BUTTON_RTRIG", GamepadButton::RightTrigger2, 197),
+    ("BUTTON_LSTICK", GamepadButton::LeftThumb, 198),
+    ("BUTTON_RSTICK", GamepadButton::RightThumb, 199),
+    ("BUTTON_START", GamepadButton::Start, 200),
+    ("BUTTON_BACK", GamepadButton::Select, 201),
+    ("DPAD_UP", GamepadButton::DPadUp, 202),
+    ("DPAD_DOWN", GamepadButton::DPadDown, 203),
+    ("DPAD_LEFT", GamepadButton::DPadLeft, 204),
+    ("DPAD_RIGHT", GamepadButton::DPadRight, 205),
+];
+
+fn pad_row(button: GamepadButton) -> Option<&'static (&'static str, GamepadButton, usize)> {
+    PAD_BUTTONS.iter().find(|(_, b, _)| *b == button)
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BindButton {
     Key(KeyCode),
     Mouse(MouseButton),
+    /// Any connected gamepad's button.
+    Pad(GamepadButton),
 }
 
 pub struct BindInputs<'a> {
     pub keys: &'a ButtonInput<KeyCode>,
     pub mouse: &'a ButtonInput<MouseButton>,
+    pub pads: Vec<&'a Gamepad>,
 }
 
 impl<'a> BindInputs<'a> {
-    pub fn new(keys: &'a ButtonInput<KeyCode>, mouse: &'a ButtonInput<MouseButton>) -> Self {
-        Self { keys, mouse }
+    pub fn new(
+        keys: &'a ButtonInput<KeyCode>,
+        mouse: &'a ButtonInput<MouseButton>,
+        pads: impl IntoIterator<Item = &'a Gamepad>,
+    ) -> Self {
+        Self {
+            keys,
+            mouse,
+            pads: pads.into_iter().collect(),
+        }
     }
 
     pub fn pressed(&self, button: BindButton) -> bool {
         match button {
             BindButton::Key(key) => self.keys.pressed(key),
             BindButton::Mouse(btn) => self.mouse.pressed(btn),
+            BindButton::Pad(btn) => self.pads.iter().any(|pad| pad.pressed(btn)),
         }
     }
 
@@ -102,6 +156,7 @@ impl<'a> BindInputs<'a> {
         match button {
             BindButton::Key(key) => self.keys.just_pressed(key),
             BindButton::Mouse(btn) => self.mouse.just_pressed(btn),
+            BindButton::Pad(btn) => self.pads.iter().any(|pad| pad.just_pressed(btn)),
         }
     }
 
@@ -109,6 +164,7 @@ impl<'a> BindInputs<'a> {
         match button {
             BindButton::Key(key) => self.keys.just_released(key),
             BindButton::Mouse(btn) => self.mouse.just_released(btn),
+            BindButton::Pad(btn) => self.pads.iter().any(|pad| pad.just_released(btn)),
         }
     }
 }
@@ -269,6 +325,7 @@ pub fn host_keynum(button: BindButton) -> usize {
         BindButton::Mouse(MouseButton::Back) => 183,
         BindButton::Mouse(MouseButton::Forward) => 184,
         BindButton::Mouse(_) => 185,
+        BindButton::Pad(btn) => pad_row(btn).map_or(input_iw4::KEY_COUNT, |row| row.2),
         BindButton::Key(key) => keycode_keynum(key),
     }
 }
@@ -424,7 +481,12 @@ pub fn parse_button_name(name: &str) -> Option<Vec<BindButton>> {
         "mouse3" | "mousemiddle" | "mmb" => BindButton::Mouse(MouseButton::Middle),
         "mouse4" => BindButton::Mouse(MouseButton::Back),
         "mouse5" => BindButton::Mouse(MouseButton::Forward),
-        _ => return None,
+        other => {
+            let (_, pad, _) = PAD_BUTTONS
+                .iter()
+                .find(|(pad_name, _, _)| pad_name.eq_ignore_ascii_case(other))?;
+            BindButton::Pad(*pad)
+        }
     };
     Some(vec![button])
 }
@@ -442,6 +504,7 @@ pub fn display_button(button: BindButton) -> String {
         BindButton::Mouse(MouseButton::Back) => "MOUSE4".into(),
         BindButton::Mouse(MouseButton::Forward) => "MOUSE5".into(),
         BindButton::Mouse(other) => format!("{other:?}"),
+        BindButton::Pad(btn) => pad_row(btn).map_or_else(|| format!("{btn:?}"), |row| row.0.into()),
     }
 }
 

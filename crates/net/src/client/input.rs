@@ -46,6 +46,12 @@ pub struct ClientActionInput {
     pub cl_yawspeed: f32,
     pub now_msec: i32,
     pub frame_msec: u32,
+
+    /// Gamepad left stick this frame, `[forward, right]` in -1..1; added to
+    /// the movement keys.
+    pub pad_move: [f32; 2],
+    /// Gamepad right stick this frame, `[pitch, yaw]` in degrees to turn.
+    pub pad_look: [f32; 2],
 }
 
 impl Default for ClientActionInput {
@@ -66,6 +72,8 @@ impl Default for ClientActionInput {
             cl_yawspeed: CL_YAWSPEED_DEFAULT,
             now_msec: 16,
             frame_msec: 16,
+            pad_move: [0.0; 2],
+            pad_look: [0.0; 2],
         }
     }
 }
@@ -141,12 +149,12 @@ pub fn build_usercmd(input: &mut ClientActionInput, look: &LookState, server_tim
         server_time,
         angles: look.angles,
         buttons: bits,
-        forwardmove: axis_to_move(axes.forward),
-        rightmove: axis_to_move(axes.right),
+        forwardmove: axis_to_move((axes.forward + input.pad_move[0]).clamp(-1.0, 1.0)),
+        rightmove: axis_to_move((axes.right + input.pad_move[1]).clamp(-1.0, 1.0)),
         mouse_pitch_delta: mouse_pitch,
         mouse_yaw_delta: mouse_yaw,
-        key_pitch_delta: 0,
-        key_yaw_delta: 0,
+        key_pitch_delta: (input.pad_look[0] * ANGLE2SHORT) as i32,
+        key_yaw_delta: (input.pad_look[1] * ANGLE2SHORT) as i32,
         frozen: false,
     })
 }
