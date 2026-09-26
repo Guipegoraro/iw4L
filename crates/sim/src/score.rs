@@ -228,6 +228,13 @@ fn advance_prematch(world: &mut FrameWorld, tick: Tick) {
         .filter(|(_, row)| row.lifecycle == ClientLifecycle::Alive)
         .count() as u32;
     world.bump_max_alive_seen(alive);
+    // Alone in the match: there is nobody to wait for or count down with, so
+    // play at once. Whoever joins later joins a match in progress.
+    if alive == 1 && world.clients_scoreboard().len() == 1 {
+        world.set_prematch(PrematchStep::Done);
+        finish_prematch(world, tick);
+        return;
+    }
     let next = world
         .prematch()
         .advance(MATCH_TICK_MS, world.max_alive_seen());
