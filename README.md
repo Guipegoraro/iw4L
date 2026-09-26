@@ -104,6 +104,14 @@ Changes on top of upstream, newest last. Every change is recorded here.
   With a pad, while skating and not aiming, the view swings round to follow
   the board, since the right stick is busy with tricks.
   The board is not drawn yet, so tricks show only as pops and catches.
+- **Black Ops 1 content.** Put a shortcut named e.g. `Black Ops.lnk` to a BO1
+  install inside the MW2 folder (`IW4L_GAMES`): shortcut targets are extra
+  search roots. Then `map t5:mp_nuked` (any `t5:mp_*` map) loads a BO1
+  multiplayer map and `give t5:famas`, `give t5:commando`, … hand out BO1
+  guns, also on MW2 maps. The zombie maps (`zombie_*`) do not load yet: they
+  are single-player zones with other asset layouts (their clipmap has no
+  brush table in IW4L's reader) and their gameplay is GSC script, which IW4L
+  does not run.
 - **Windows test runs.** `cargo run -p approved_tests -- heavy_gameplay_lifecycle`
   works on Windows (junction for the shared cache, `iw4l.exe`, newest log when
   there is no `latest.log`). `IW4L_KEEP_CWD=1` stops the launcher moving into
