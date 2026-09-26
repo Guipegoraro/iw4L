@@ -124,7 +124,9 @@ Changes on top of upstream, newest last. Every change is recorded here.
   configs) to `iw4l-artifacts/rawfiles/<zone>/`, unpacking the compressed
   scripts to plain text. It is how the zombie scripts are read for porting,
   and works the same on a custom map's or mod's zone. A map zone also gives
-  `mapents.txt`, its entity string (spawners, zones, doors, path nodes). The output is your own
+  `mapents.txt`, its entity string (spawners, zones, doors, path nodes), and
+  string tables come out as CSV (e.g. `mp/zombiemode.csv`, the zombies
+  tuning table per difficulty). The output is your own
   game data; keep it out of the repository.
 - **Windows test runs.** `cargo run -p approved_tests -- heavy_gameplay_lifecycle`
   works on Windows (junction for the shared cache, `iw4l.exe`, newest log when

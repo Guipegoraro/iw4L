@@ -9,7 +9,7 @@
 
 use std::path::{Path, PathBuf};
 
-use fastfile_t5::{AssetLinkSink, AssetSink, AssetType, Ptr, ScriptStrings, ZoneStream};
+use fastfile_t5::{AssetLinkSink, AssetSink, AssetType, Ptr, ScriptStrings, ZonePtr, ZoneStream};
 
 #[derive(Debug, Default)]
 pub struct RawFileExport {
@@ -99,6 +99,38 @@ impl AssetLinkSink for RawFileSink {
         Ok(())
     }
 
+    /// String tables (`mp/zombiemode.csv`, weapon and perk tables) come back
+    /// out as CSV.
+    fn capture_string_table(&mut self, s: &ZoneStream<'_>, header: Ptr) -> fastfile_t5::Result<()> {
+        let text_at = |slot: Ptr| match s.ptr_at(slot, 0) {
+            Ok(ZonePtr::Offset(p)) => s.cstr(s.resolve_alias(p)).unwrap_or("").to_owned(),
+            _ => String::new(),
+        };
+        let name = text_at(header);
+        if name.is_empty() {
+            return Ok(());
+        }
+        let columns = s.i32_at(header, 4).unwrap_or(0).max(0) as usize;
+        let rows = s.i32_at(header, 8).unwrap_or(0).max(0) as usize;
+        let mut csv = String::new();
+        if let Ok(ZonePtr::Offset(cells)) = s.ptr_at(header, 12) {
+            let cells = s.resolve_alias(cells);
+            for row in 0..rows {
+                let line: Vec<_> = (0..columns)
+                    .map(|col| {
+                        let cell =
+                            cells.at((row * columns + col) * fastfile_t5::size::STRING_TABLE_CELL);
+                        text_at(cell)
+                    })
+                    .collect();
+                csv.push_str(&line.join(","));
+                csv.push('\n');
+            }
+        }
+        self.write(&name, csv.as_bytes(), false);
+        Ok(())
+    }
+
     fn capture_raw_file(
         &mut self,
         name: &str,
@@ -107,7 +139,17 @@ impl AssetLinkSink for RawFileSink {
     ) -> fastfile_t5::Result<()> {
         let data = data.strip_suffix(&[0]).unwrap_or(data);
         let unpacked = unpack(data);
-        let body = unpacked.as_deref().unwrap_or(data);
+        self.write(
+            name,
+            unpacked.as_deref().unwrap_or(data),
+            unpacked.is_some(),
+        );
+        Ok(())
+    }
+}
+
+impl RawFileSink {
+    fn write(&mut self, name: &str, body: &[u8], inflated: bool) {
         // Zone names use `/` or `\`; keep them inside the output folder.
         let relative: PathBuf = name
             .split(['/', '\\'])
@@ -122,7 +164,7 @@ impl AssetLinkSink for RawFileSink {
         match written {
             Ok(()) => {
                 self.export.files += 1;
-                self.export.inflated += usize::from(unpacked.is_some());
+                self.export.inflated += usize::from(inflated);
                 self.export.bytes += body.len();
             }
             Err(error) if self.error.is_none() => {
@@ -130,6 +172,5 @@ impl AssetLinkSink for RawFileSink {
             }
             Err(_) => {}
         }
-        Ok(())
     }
 }
