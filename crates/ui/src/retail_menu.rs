@@ -54,6 +54,7 @@ pub(crate) struct RetailPaintCtx<'w> {
     class_icons: Res<'w, crate::ClassSelectIconCache>,
     strings: Option<Res<'w, assets::PreparedLocalizedStrings>>,
     mod_menu: Res<'w, crate::mod_menu::ModMenuView>,
+    mod_guide: Res<'w, crate::mod_guide::ModGuide>,
 }
 
 #[derive(SystemParam)]
@@ -164,6 +165,7 @@ pub(crate) fn spawn_retail_shell(
         browser,
         bridge,
         mod_menu: Some(&paint.mod_menu),
+        mod_guide: Some(&paint.mod_guide),
     };
     let screens = screens::resolve_stack(catalog, &stack.names, host);
     if !stack.visible_exp_gap_said {

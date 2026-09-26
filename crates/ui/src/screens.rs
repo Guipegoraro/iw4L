@@ -33,6 +33,7 @@ pub struct Host<'a> {
     pub browser: Option<&'a net::MasterBrowserSnapshot>,
     pub bridge: Option<&'a net::MasterBridgeState>,
     pub mod_menu: Option<&'a crate::mod_menu::ModMenuView>,
+    pub mod_guide: Option<&'a crate::mod_guide::ModGuide>,
 }
 
 impl<'a> Host<'a> {
@@ -57,6 +58,7 @@ impl<'a> Host<'a> {
             browser: None,
             bridge: None,
             mod_menu: None,
+            mod_guide: None,
         }
     }
 }
@@ -85,6 +87,9 @@ pub fn lookup(id: &str, host: Host<'_>) -> Option<Screen> {
         "class_setup" => Some(class_setup(host)),
         "options" | "options_multi" => Some(options(host)),
         id if crate::mod_menu::is_mod_menu(id) => Some(crate::mod_menu::screen(id, host.mod_menu)),
+        id if crate::mod_guide::is_mod_guide(id) => {
+            Some(crate::mod_guide::screen(id, host.mod_guide))
+        }
         _ => None,
     }
 }
@@ -3232,6 +3237,11 @@ pub fn ingame_options(info: Option<&InGameMenuInfo>) -> Screen {
             "options",
             "Options",
             vec![ScreenCmd::Open("options".into())],
+        ),
+        (
+            "mod_guide",
+            "Mod Guide",
+            vec![ScreenCmd::Open(crate::mod_guide::MOD_GUIDE_ROOT.into())],
         ),
         ("favorites", "Add To Favorites", vec![]),
         ("vote", "Call Vote", vec![]),

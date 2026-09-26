@@ -54,7 +54,7 @@ Changes on top of upstream, newest last. Every change is recorded here.
   | button | action | button | action |
   | --- | --- | --- | --- |
   | A | jump / ollie | RT | fire |
-  | B | crouch / prone | LT | aim |
+  | B | crouch | LT | aim |
   | X | use / reload | RB | lethal |
   | Y | switch weapon | LB | tactical |
   | L3 | sprint | R3 | melee |
@@ -62,6 +62,14 @@ Changes on top of upstream, newest last. Every change is recorded here.
 
   In a menu the D-pad moves, A picks and B goes back. Settings files saved
   before gamepad support get these binds once on load.
+- **Mod guide.** The pause menu (Esc) has a **Mod Guide** entry: how to use
+  every addition, one page per topic. A feature adds its own page with
+  `app.add_mod_guide_topic(..)` (`crates/ui/src/mod_guide.rs`).
+- **Solo matches start at once.** Alone in a match, there is no wait for
+  players and no countdown: you play as soon as you spawn.
+- **`IW4L_TIME_LIMIT`** sets the match time limit in minutes; `0` plays with
+  no limit (e.g. `IW4L_TIME_LIMIT=0` in `.env`). `IW4L_SCORE_LIMIT` already
+  existed.
 - **Windows test runs.** `cargo run -p approved_tests -- heavy_gameplay_lifecycle`
   works on Windows (junction for the shared cache, `iw4l.exe`, newest log when
   there is no `latest.log`). `IW4L_KEEP_CWD=1` stops the launcher moving into

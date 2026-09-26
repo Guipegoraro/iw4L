@@ -13,6 +13,7 @@ mod menu;
 mod menu_import;
 mod menu_load;
 mod menu_shots;
+mod mod_guide;
 mod mod_menu;
 mod model;
 mod nav;
@@ -54,6 +55,7 @@ pub use menu::{
     PendingMenuBgPixels, PendingMenuMap,
 };
 pub use menu_shots::MenuShotPlan;
+pub use mod_guide::{MOD_GUIDE_ROOT, ModGuide, ModGuideAppExt, ModGuideTopic};
 pub use mod_menu::{
     MOD_MENU_ROOT, ModMenuAppExt, ModMenuEntry, ModMenuPage, ModMenuRequest, ModMenuView,
 };
