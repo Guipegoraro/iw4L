@@ -1,5 +1,7 @@
 use playerstate_iw4::{ENTITYNUM_NONE, PM_TYPE_NORMAL_LINKED, PlayerState, UserCmd};
 
+use crate::mode::MoveMode;
+use crate::skate::{SkateTuning, pm_skate_tick};
 use crate::{
     AdsFracContext, AdsIntentContext, AirMoveContext, CheckLadderContext, CollisionBackend,
     LadderAttachBackend, LadderMoveContext, LadderTraceHit, MantleCapViewContext,
@@ -123,6 +125,20 @@ pub fn pm_move<C: CollisionBackend, L: MantleXAnimLength, R: MantleRootDelta>(
         ps.ground_entity_num = ENTITYNUM_NONE;
         ps.velocity = [0.0; 3];
         pm_drop_timers(ps, &pml);
+        return PmoveResult { pml, bounds };
+    }
+
+    if MoveMode::of(ps) == MoveMode::Skate {
+        // Skate replaces mantle, ladder, walk and air: the board owns the body.
+        pm_skate_tick(
+            ps,
+            &mut pml,
+            cmd,
+            context.old_buttons,
+            &SkateTuning::DEFAULT,
+            bounds,
+            collision,
+        );
         return PmoveResult { pml, bounds };
     }
 

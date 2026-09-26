@@ -117,6 +117,7 @@ pub use identities::{
 };
 pub use input::{ActionRequestId, ClassId, ClientAction, SpawnPick, TickInput, action_request_id};
 pub use mantle_xanim::MantleXAnimBind;
+pub use movement_iw4::MoveMode;
 pub use match_state::{
     CLASS_CATALOG_BLING, CLASS_CATALOG_COLD_BLOODED, CLASS_CATALOG_DANGER_CLOSE,
     CLASS_CATALOG_LIGHTWEIGHT, CLASS_CATALOG_MARATHON, CLASS_CATALOG_NINJA,

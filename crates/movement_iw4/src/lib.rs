@@ -22,9 +22,11 @@ mod jump;
 mod ladder;
 mod mantle;
 mod melee_charge;
+mod mode;
 mod pml;
 mod pmove;
 mod single;
+mod skate;
 mod slide;
 mod snap;
 mod sprint;
@@ -95,11 +97,13 @@ pub use melee_charge::{
     MeleeChargeWeaponDelays, PLAYER_MELEE_RANGE_DEFAULT as MELEE_CHARGE_PLAYER_MELEE_RANGE_DEFAULT,
     pm_calc_melee_charge_time, pm_melee_charge_clear, pm_melee_charge_move,
 };
+pub use mode::{MoveMode, pm_set_move_mode};
 pub use pml::Pml;
 pub use pmove::Pmove;
 pub use single::{
     GroundTraceInput, MoveBounds, PmoveResult, PmoveSingle, PmoveSingleContext, pm_move,
 };
+pub use skate::{SkateOutcome, SkateTuning, pm_skate_land, pm_skate_move, pm_skate_tick};
 pub(crate) use slide::pm_project_velocity;
 pub use slide::{pm_slide_move, pm_step_slide_move};
 pub use snap::{pm_end_tick_velocity, snap_vector};

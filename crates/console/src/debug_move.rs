@@ -77,6 +77,17 @@ pub(crate) fn register_debug_move_commands(registry: &mut ConsoleRegistry) {
                 .usage("heal — restore Alive health to max (needs cheats; invented)"),
         );
     }
+    if registry.resolve("movemode").is_none() {
+        registry.register(crate::CommandSpec::new("movemode").usage(
+            "movemode [normal|skate] — show or switch the movement mode (needs cheats; invented)",
+        ));
+    }
+    if registry.resolve("skate").is_none() {
+        registry.register(
+            crate::CommandSpec::new("skate")
+                .usage("skate [on|off] — toggle skateboard movement (needs cheats; invented)"),
+        );
+    }
     if registry.resolve("look").is_none() {
         registry.register(
             crate::CommandSpec::new("look")
@@ -397,36 +408,53 @@ pub(crate) fn route_debug_move_commands(
                 );
             }
             "heal" => {
-                if !alive(&presented, local.0) {
-                    echo(
-                        "heal: not Alive — spawn a class first".into(),
-                        &mut console,
-                        &mut line,
-                    );
-                    continue;
-                }
-                if authority.as_ref().is_some_and(|a| !a.0.cheats_enabled()) {
-                    echo("heal: cheats are off".into(), &mut console, &mut line);
-                    continue;
-                }
-                let Some(inbox) = inbox.as_deref_mut() else {
-                    echo(
-                        "heal: no action inbox (not a listen host)".into(),
-                        &mut console,
-                        &mut line,
-                    );
-                    continue;
+                let mut cheat = CheatQueue {
+                    presented: &presented,
+                    local: local.0,
+                    authority: authority.as_deref(),
+                    inbox: inbox.as_deref_mut(),
+                    seq: &mut seq,
                 };
-                let request_id = seq.allocate();
-                if let Err(error) = inbox.push(local.0, ClientAction::DebugHeal { request_id }) {
-                    echo(format!("heal: {error}"), &mut console, &mut line);
-                    continue;
-                }
-                echo(
-                    format!("heal: queued request_id={request_id}"),
-                    &mut console,
-                    &mut line,
-                );
+                let msg = cheat.queue("heal", |request_id| ClientAction::DebugHeal { request_id });
+                echo(msg, &mut console, &mut line);
+            }
+            "movemode" | "skate" => {
+                let current = presented.alive_player(local.0).map(sim::MoveMode::of);
+                let wanted = match (cmd.name.as_str(), cmd.args.first().map(String::as_str)) {
+                    ("skate", None) => Ok(if current == Some(sim::MoveMode::Skate) {
+                        sim::MoveMode::Normal
+                    } else {
+                        sim::MoveMode::Skate
+                    }),
+                    ("skate", Some("on" | "1")) => Ok(sim::MoveMode::Skate),
+                    ("skate", Some("off" | "0")) => Ok(sim::MoveMode::Normal),
+                    ("movemode", None) => Err(format!(
+                        "movemode: {}",
+                        current.map_or("(not Alive)", sim::MoveMode::name)
+                    )),
+                    ("movemode", Some(name)) => sim::MoveMode::from_name(name)
+                        .ok_or_else(|| format!("movemode: unknown mode {name:?}")),
+                    _ => Err(format!("usage: {}", cmd.name)),
+                };
+                let msg = match wanted {
+                    Ok(mode) => {
+                        let mut cheat = CheatQueue {
+                            presented: &presented,
+                            local: local.0,
+                            authority: authority.as_deref(),
+                            inbox: inbox.as_deref_mut(),
+                            seq: &mut seq,
+                        };
+                        let queued =
+                            cheat.queue(&cmd.name, |request_id| ClientAction::SetMoveMode {
+                                request_id,
+                                mode: mode as u32,
+                            });
+                        format!("{queued} mode={}", mode.name())
+                    }
+                    Err(msg) => msg,
+                };
+                echo(msg, &mut console, &mut line);
             }
             "nudge" => {
                 if cmd.args.len() != 3 {
@@ -632,6 +660,40 @@ pub(crate) fn update_showpos_overlay(
     }
 }
 
+/// The gate every cheat action shares: the local player is Alive, cheats are
+/// on, and this process hosts the authority. A new cheat command is one
+/// `queue` call with the action it sends.
+struct CheatQueue<'a> {
+    presented: &'a PresentedSnapshot,
+    local: sim::ClientId,
+    authority: Option<&'a net::AuthorityWorld>,
+    inbox: Option<&'a mut ClientActionInbox>,
+    seq: &'a mut net::ActionRequestIds,
+}
+
+impl CheatQueue<'_> {
+    fn queue(
+        &mut self,
+        name: &str,
+        action: impl FnOnce(sim::ActionRequestId) -> ClientAction,
+    ) -> String {
+        if !alive(self.presented, self.local) {
+            return format!("{name}: not Alive — spawn a class first");
+        }
+        if self.authority.is_some_and(|a| !a.0.cheats_enabled()) {
+            return format!("{name}: cheats are off");
+        }
+        let Some(inbox) = self.inbox.as_deref_mut() else {
+            return format!("{name}: no action inbox (not a listen host)");
+        };
+        let request_id = self.seq.allocate();
+        match inbox.push(self.local, action(request_id)) {
+            Ok(()) => format!("{name}: queued request_id={request_id}"),
+            Err(error) => format!("{name}: {error}"),
+        }
+    }
+}
+
 fn alive(presented: &PresentedSnapshot, id: sim::ClientId) -> bool {
     presented
         .snapshot()
@@ -644,7 +706,7 @@ fn format_showpos(presented: &PresentedSnapshot, id: sim::ClientId) -> String {
         Some(ps) => {
             let eye_z = ps.origin[2] + ps.view_height_current;
             format!(
-                "showpos origin={:.1} {:.1} {:.1}  eye={:.1} {:.1} {:.1}  yaw={:.0} pitch={:.0}",
+                "showpos origin={:.1} {:.1} {:.1}  eye={:.1} {:.1} {:.1}  yaw={:.0} pitch={:.0}  {}",
                 ps.origin[0],
                 ps.origin[1],
                 ps.origin[2],
@@ -652,7 +714,8 @@ fn format_showpos(presented: &PresentedSnapshot, id: sim::ClientId) -> String {
                 ps.origin[1],
                 eye_z,
                 ps.viewangles[1],
-                ps.viewangles[0]
+                ps.viewangles[0],
+                format_motion(ps)
             )
         }
         None => "showpos: not Alive".into(),
@@ -671,6 +734,9 @@ fn format_showpos_live(
         .and_then(|s| s.meta.for_client(id))
         .map(|m| format!("{:?}", m.lifecycle))
         .unwrap_or_else(|| "—".into());
+    let motion = presented
+        .alive_player(id)
+        .map_or_else(String::new, format_motion);
     let (origin, eye, yaw, pitch, vz, ground) = match presented.alive_player(id) {
         Some(ps) => {
             let eye_z = ps.origin[2] + ps.view_height_current;
@@ -701,8 +767,21 @@ fn format_showpos_live(
         held_names.join(",")
     };
     format!(
-        "showpos tick={tick} life={life} origin={origin} eye={eye} yaw={yaw:.0} pitch={pitch:.0} vz={vz:.0} ground={ground} held=[{held}] fps={fps:.0}"
+        "showpos tick={tick} life={life} origin={origin} eye={eye} yaw={yaw:.0} pitch={pitch:.0} vz={vz:.0} ground={ground} {motion} held=[{held}] fps={fps:.0}"
     )
+}
+
+/// Ground speed and movement mode; the skate state when skating.
+fn format_motion(ps: &playerstate_iw4::PlayerState) -> String {
+    let speed = ps.velocity[0].hypot(ps.velocity[1]);
+    let mode = sim::MoveMode::of(ps);
+    match mode {
+        sim::MoveMode::Normal => format!("speed={speed:.0}"),
+        sim::MoveMode::Skate => format!(
+            "speed={speed:.0} vz={:.0} mode=skate board_yaw={:.0} pop={}ms bail={}ms",
+            ps.velocity[2], ps.skate_yaw, ps.skate_pop_ms, ps.skate_bail_ms
+        ),
+    }
 }
 
 fn parse_move(

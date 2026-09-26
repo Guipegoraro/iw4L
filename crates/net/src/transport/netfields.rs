@@ -366,6 +366,11 @@ ps_netfields! {
     kill_cam_look_at_entity: i32 = "killCamLookAtEntity", 0x840, Replication::Replicated, Validation::Exact;
     kill_cam_client_num: i32 = "killCamClientNum", 0x844, Replication::Replicated, Validation::Exact;
     recoil_scale: i32 = "recoilScale", 0x3110, Replication::Replicated, Validation::Exact;
+    // IW4L movement modes: no retail counterpart, so no retail offset.
+    move_mode: u32 = "moveMode", 0, Replication::Replicated, Validation::Exact;
+    skate_yaw: f32 = "skateYaw", 0, Replication::Replicated, Validation::Exact;
+    skate_pop_ms: i32 = "skatePopMs", 0, Replication::Replicated, Validation::Exact;
+    skate_bail_ms: i32 = "skateBailMs", 0, Replication::Replicated, Validation::Exact;
 }
 
 pub const PS_FIELD_COUNT: usize = PS_NETFIELDS.len();

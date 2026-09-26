@@ -504,6 +504,10 @@ fn default_pages() -> Vec<ModMenuPage> {
             .command("Take 40 damage", "damage 40")
             .command("Show position", "showpos on")
             .command("Hide position", "showpos off"),
+        ModMenuPage::new("skate", "SKATE")
+            .on_root("Skate")
+            .command_and_close("Skate on", "skate on")
+            .command_and_close("Skate off (walk)", "skate off"),
         // Filled once a match prepares its weapons.
         ModMenuPage::new("weapons", "GIVE WEAPON").on_root("Weapons"),
         ModMenuPage::new("bots", "BOTS")

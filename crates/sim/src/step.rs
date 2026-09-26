@@ -1255,6 +1255,10 @@ fn apply_actions(world: &mut FrameWorld, tick: Tick, actions: &[(ClientId, Clien
                 apply_debug_damage(world, tick, *id, amount);
             }
             ClientAction::DebugHeal { request_id: _ } => apply_debug_heal(world, *id),
+            ClientAction::SetMoveMode {
+                request_id: _,
+                mode,
+            } => apply_set_move_mode(world, *id, mode),
         }
     }
 }
@@ -1404,6 +1408,25 @@ fn apply_debug_heal(world: &mut FrameWorld, id: ClientId) {
     }
     if let Some(ps) = world.player_mut(id) {
         ps.health = ps.max_health;
+    }
+}
+
+fn apply_set_move_mode(world: &mut FrameWorld, id: ClientId, mode: u32) {
+    if !world.bootstrap_ref().allow_debug_actions
+        || !world
+            .client_meta(id)
+            .is_some_and(|m| m.lifecycle == ClientLifecycle::Alive)
+    {
+        return;
+    }
+    let Some(mode) = movement_iw4::MoveMode::ALL
+        .into_iter()
+        .find(|m| *m as u32 == mode)
+    else {
+        return;
+    };
+    if let Some(ps) = world.player_mut(id) {
+        movement_iw4::pm_set_move_mode(ps, mode);
     }
 }
 

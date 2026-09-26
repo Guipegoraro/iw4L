@@ -113,6 +113,14 @@ pub struct PlayerState {
     pub kill_cam_look_at_entity: i32,
     pub kill_cam_client_num: i32,
     pub recoil_scale: i32,
+    /// IW4L movement mode, not a retail field: `movement_iw4::MoveMode`.
+    pub move_mode: u32,
+    /// Skate mode: the board's heading, independent of the view.
+    pub skate_yaw: f32,
+    /// Skate mode: how long the ollie has been wound up, in ms.
+    pub skate_pop_ms: i32,
+    /// Skate mode: time left in a bail, in ms; no control while above zero.
+    pub skate_bail_ms: i32,
 }
 
 pub mod eflags {
@@ -292,6 +300,10 @@ impl PlayerState {
         kill_cam_look_at_entity: 0,
         kill_cam_client_num: 0,
         recoil_scale: 0,
+        move_mode: 0,
+        skate_yaw: 0.0,
+        skate_pop_ms: 0,
+        skate_bail_ms: 0,
     };
 
     pub fn anim(&self) -> AnimPair {

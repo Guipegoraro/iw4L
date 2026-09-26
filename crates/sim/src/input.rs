@@ -78,6 +78,12 @@ pub enum ClientAction {
         request_id: ActionRequestId,
     },
 
+    /// Switch an Alive player's movement mode (`MoveMode as u32`); cheats only.
+    SetMoveMode {
+        request_id: ActionRequestId,
+        mode: u32,
+    },
+
     SetName {
         request_id: ActionRequestId,
         name: [u8; 16],
@@ -132,6 +138,7 @@ pub fn action_request_id(action: &ClientAction) -> ActionRequestId {
         | ClientAction::BeginScriptMoverRotateVelocity { request_id, .. }
         | ClientAction::DebugDamage { request_id, .. }
         | ClientAction::DebugHeal { request_id }
+        | ClientAction::SetMoveMode { request_id, .. }
         | ClientAction::SetName { request_id, .. }
         | ClientAction::UseCopycat { request_id } => request_id,
     }

@@ -477,6 +477,11 @@ pub(crate) fn encode_action(out: &mut WireWriter, action: &ClientAction) {
             out.put_u8(16);
             out.put_u32(request_id);
         }
+        ClientAction::SetMoveMode { request_id, mode } => {
+            out.put_u8(17);
+            out.put_u32(request_id);
+            out.put_u32(mode);
+        }
         ClientAction::ForceDeath { request_id } => {
             out.put_u8(4);
             out.put_u32(request_id);
@@ -574,6 +579,10 @@ pub(crate) fn decode_action(input: &mut WireReader<'_>) -> Result<ClientAction, 
         }),
         16 => Ok(ClientAction::DebugHeal {
             request_id: input.get_u32()?,
+        }),
+        17 => Ok(ClientAction::SetMoveMode {
+            request_id: input.get_u32()?,
+            mode: input.get_u32()?,
         }),
         11 => {
             let request_id = input.get_u32()?;
