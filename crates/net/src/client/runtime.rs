@@ -892,6 +892,13 @@ pub fn sample_client_input(
     }
     let mut cmd = build_usercmd(&mut actions, &look, 0);
     look.angles = cmd.angles;
+    // +usereload (a pad's X) reloads unless a use prompt is showing, as on
+    // console; the use bit stays set for doors and pickups.
+    if cmd.buttons & playerstate_iw4::buttons::USE_RELOAD != 0
+        && ps.is_some_and(|ps| ps.cursor_hint == 0)
+    {
+        cmd.buttons |= playerstate_iw4::buttons::RELOAD;
+    }
     if let Some((mouse_x, mouse_y)) = remote_mouse {
         cmd.remote_control = remote_control_axes(&actions, mouse_x, mouse_y);
         cmd.buttons |= playerstate_iw4::buttons::REMOTE_CONTROL;
