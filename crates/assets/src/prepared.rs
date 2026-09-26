@@ -59,6 +59,33 @@ pub struct PreparedMap {
 #[derive(Clone, Debug, Default, Resource)]
 pub struct PreparedWeapons(pub std::sync::Arc<WeaponRegistry>);
 
+impl PreparedWeapons {
+    /// Short keys `give` accepts: offered primary and secondary families that
+    /// have a gun model, sorted.
+    pub fn giveable_names(&self) -> Vec<String> {
+        let mut names: Vec<String> = self
+            .0
+            .weapon_families()
+            .offered()
+            .filter(|family| {
+                matches!(
+                    family.slot,
+                    crate::FamilySlot::Primary | crate::FamilySlot::Secondary
+                )
+            })
+            .filter(|family| {
+                family
+                    .base
+                    .is_some_and(|id| self.0.gun_xmodel_of(id).is_some())
+            })
+            .map(|family| family.key.short())
+            .collect();
+        names.sort();
+        names.dedup();
+        names
+    }
+}
+
 #[derive(Clone, Debug, Default, Resource)]
 pub struct MatchType10SoundHints(pub Vec<String>);
 

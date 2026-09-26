@@ -1,6 +1,6 @@
 use std::sync::{Arc, RwLock};
 
-use assets::{FamilySlot, LoadoutRules, PreparedWeapons, WeaponSelection};
+use assets::{LoadoutRules, PreparedWeapons, WeaponSelection};
 use bevy::prelude::*;
 use frame::MatchTornDown;
 use net::{ClientActionInbox, LocalPresentClient, PresentedSnapshot};
@@ -89,7 +89,7 @@ pub(crate) fn refresh_weapon_arg_completions(
     }
     *last_held = Some(held);
     if let Ok(mut give) = completions.give.write() {
-        *give = weapon_completions(weapons);
+        *give = weapons.giveable_names();
     }
     if let Ok(mut attach) = completions.attach.write() {
         *attach = if held == 0 {
@@ -437,24 +437,6 @@ fn toggle_named_attachment(
         .toggle
         .clone()
         .map_err(|refusal| format!("{refusal} ({})", refusal.code()))
-}
-
-pub fn weapon_completions(weapons: &PreparedWeapons) -> Vec<String> {
-    let mut names: Vec<String> = weapons
-        .0
-        .weapon_families()
-        .offered()
-        .filter(|family| matches!(family.slot, FamilySlot::Primary | FamilySlot::Secondary))
-        .filter(|family| {
-            family
-                .base
-                .is_some_and(|id| weapons.0.gun_xmodel_of(id).is_some())
-        })
-        .map(|family| family.key.short())
-        .collect();
-    names.sort();
-    names.dedup();
-    names
 }
 
 pub fn attach_completions(weapons: &PreparedWeapons, current_weapon: u32) -> Vec<String> {

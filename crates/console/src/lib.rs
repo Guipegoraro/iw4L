@@ -38,7 +38,7 @@ pub use plugin::{
     ConsoleSettings, ConsoleState,
 };
 pub use registry::{ArgCompleter, CommandSpec, ConsoleRegistry, StaticCompleter};
-pub use weapon_dispatch::{attach_completions, weapon_completions};
+pub use weapon_dispatch::attach_completions;
 
 use input_iw4::{command_id_lookup, command_name};
 
