@@ -66,6 +66,9 @@ pub fn run(launch: Launch<'_>) -> Outcome {
     command
         .args(&launch.args)
         .current_dir(launch.cwd)
+        // The run directory owns everything the game writes; on Windows the
+        // launcher would otherwise move into the exe's folder.
+        .env("IW4L_KEEP_CWD", "1")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::from(stderr_file));

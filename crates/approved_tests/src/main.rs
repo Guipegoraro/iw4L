@@ -76,7 +76,7 @@ fn parse_args(root: &Path) -> Result<Args, String> {
         seed: None,
         replay: None,
         cache: CacheMode::Cold,
-        bin: root.join("target/play/iw4l"),
+        bin: root.join(format!("target/play/iw4l{}", std::env::consts::EXE_SUFFIX)),
     };
     while let Some(flag) = it.next() {
         let mut value = || it.next().ok_or(format!("{flag} needs a value"));
@@ -359,7 +359,7 @@ fn prepare_cache(root: &Path, run_dir: &Path, mode: CacheMode) -> Result<Value, 
             let shared = root.join("iw4l-artifacts/cache");
             std::fs::create_dir_all(&child_artifacts)
                 .map_err(|e| format!("create {}: {e}", child_artifacts.display()))?;
-            std::os::unix::fs::symlink(&shared, &child_cache)
+            link_dir(&shared, &child_cache)
                 .map_err(|e| format!("link {}: {e}", child_cache.display()))?;
             Ok(json!({
                 "mode": "shared",
@@ -370,6 +370,33 @@ fn prepare_cache(root: &Path, run_dir: &Path, mode: CacheMode) -> Result<Value, 
                 "not_controlled": uncontrolled,
             }))
         }
+    }
+}
+
+#[cfg(unix)]
+fn link_dir(target: &Path, link: &Path) -> std::io::Result<()> {
+    std::os::unix::fs::symlink(target, link)
+}
+
+/// A directory symlink needs Developer Mode or an elevated shell on Windows;
+/// a junction needs neither, so it is the fallback.
+#[cfg(windows)]
+fn link_dir(target: &Path, link: &Path) -> std::io::Result<()> {
+    if std::os::windows::fs::symlink_dir(target, link).is_ok() {
+        return Ok(());
+    }
+    let status = std::process::Command::new("cmd")
+        .args(["/C", "mklink", "/J"])
+        .arg(link)
+        .arg(target)
+        .stdout(std::process::Stdio::null())
+        .status()?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(std::io::Error::other(format!(
+            "mklink /J exited with {status}"
+        )))
     }
 }
 

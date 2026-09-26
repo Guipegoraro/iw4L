@@ -125,6 +125,23 @@ impl Noise {
     }
 }
 
+/// `latest.log` is a symlink the game makes on Unix only; elsewhere the run's
+/// one log is the newest `*.log` in its own folder.
+fn child_log(dir: &Path) -> PathBuf {
+    let latest = dir.join("latest.log");
+    if latest.exists() {
+        return latest;
+    }
+    std::fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "log"))
+        .max_by_key(|path| std::fs::metadata(path).and_then(|m| m.modified()).ok())
+        .unwrap_or(latest)
+}
+
 fn read_log(path: &Path) -> (BTreeMap<String, PhaseLog>, Noise) {
     let mut phases: BTreeMap<String, PhaseLog> = BTreeMap::new();
     let mut unphased = Noise::default();
@@ -243,7 +260,8 @@ impl Assertions {
 
 pub fn finish(run_dir: &Path, manifest: &mut Value, phases: &[Phase], outcome: &Outcome) -> bool {
     let child = run_dir.join("iw4l-artifacts");
-    let (log, unphased) = read_log(&child.join("logs/latest.log"));
+    let log_path = child_log(&child.join("logs"));
+    let (log, unphased) = read_log(&log_path);
     let marks = &outcome.marks;
     let lifecycle = &outcome.lifecycle;
 
@@ -577,7 +595,7 @@ pub fn finish(run_dir: &Path, manifest: &mut Value, phases: &[Phase], outcome: &
 
     manifest["artifacts"] = json!({
         "captures": captures,
-        "log": child.join("logs/latest.log").display().to_string(),
+        "log": log_path.display().to_string(),
         "perf_run": perf_run(&child.join("runs")).map(|p| p.display().to_string()),
         "child_stdout": run_dir.join("child_stdout.txt").display().to_string(),
         "child_stderr": run_dir.join("child_stderr.txt").display().to_string(),

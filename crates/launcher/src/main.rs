@@ -18,9 +18,12 @@ fn main() {
     bootstrap::launch(games, artifacts, mode, acceptance);
 }
 
+/// On Windows the process works from the exe's folder, so a double-clicked or
+/// shortcut launch finds its artifacts beside the exe. `IW4L_KEEP_CWD` keeps
+/// the caller's directory instead, for a controller that owns the run folder.
 fn prepare_process_root() -> Result<(), String> {
     #[cfg(windows)]
-    {
+    if std::env::var_os("IW4L_KEEP_CWD").is_none() {
         let exe =
             std::env::current_exe().map_err(|error| format!("cannot locate iw4l.exe: {error}"))?;
         let root = exe

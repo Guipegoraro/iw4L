@@ -39,10 +39,10 @@ pointers. MW2 is read in both serializations; **MW3 x64 zones are detected and
 refused**, so an MW3 shortcut to such an install contributes no weapons and no
 maps, and says so in the log (`IW5 zone is serialized x64 (Steam re-release)`).
 
-The folder holding the two executables is the process working directory even
-when Explorer supplies another; `IW4L_GAMES` defaults to it, and `.lnk` targets
-inside it are additional read-only search roots. `.env` is loaded before
-release-manifest defaults, created only when missing and never overwritten.
+The folder holding the two executables is the working directory, even when
+Explorer supplies another (`IW4L_KEEP_CWD=1` keeps the caller's); `IW4L_GAMES`
+defaults to it, and `.lnk` targets inside it add read-only search roots. `.env`
+loads before release-manifest defaults, created only when missing, never overwritten.
 
 `.env` holds `IW4L_UPDATE_URL=https://host:8443/prod` plus the master keys
 from [`MASTER.md`](MASTER.md). An unreachable master is not a launch error: the browser keeps retrying. All
