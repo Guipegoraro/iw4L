@@ -306,6 +306,7 @@ impl Plugin for ConsolePlugin {
                 (
                     crate::user_settings::route_view_commands,
                     crate::user_settings::sync_third_person_view,
+                    crate::timescale::route_timescale_commands,
                 )
                     .chain(),
             )

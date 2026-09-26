@@ -42,6 +42,9 @@ Changes on top of upstream, newest last. Every change is recorded here.
 - **`god [on|off]`** refuses all damage to you (mod menu: Player). Cheats are
   per-player bits in `sim::cheat` switched by one `SetCheat` action; a new
   cheat is a bit, the check where it bites, and a console name.
+- **`timescale [0.05..4]`** slows or speeds the whole game (1 = normal; mod
+  menu: Match has 0.25x, 0.5x, 1x, 2x). It scales the clock that drives the
+  fixed tick, so every tick stays identical; only the match host can use it.
 - **`noclip [on|off]`** flies through walls along the view: jump rises,
   crouch sinks, sprint doubles the speed (mod menu: Player). It is a movement
   mode like skate (`crates/movement_iw4/src/noclip.rs`).

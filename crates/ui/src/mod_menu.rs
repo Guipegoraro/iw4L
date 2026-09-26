@@ -494,6 +494,10 @@ fn default_pages() -> Vec<ModMenuPage> {
             .command("Start match now", "force_match_start")
             .command_and_close("Restart map", "map_restart")
             .link("Change map", "maps")
+            .command("Slow motion (0.25x)", "timescale 0.25")
+            .command("Half speed (0.5x)", "timescale 0.5")
+            .command("Normal speed", "timescale 1")
+            .command("Double speed (2x)", "timescale 2")
             .command_and_close("Leave game", "disconnect"),
         ModMenuPage::new("player", "PLAYER")
             .on_root("Player")

@@ -88,6 +88,13 @@ pub(crate) fn register_debug_move_commands(registry: &mut ConsoleRegistry) {
             "movemode [normal|skate|noclip] — show or switch the movement mode (needs cheats; invented)",
         ));
     }
+    if registry.resolve("timescale").is_none() {
+        registry.register(
+            crate::CommandSpec::new("timescale").usage(
+                "timescale [0.05..4] — slow motion or fast-forward; 1 is normal (host only)",
+            ),
+        );
+    }
     if registry.resolve("god").is_none() {
         registry
             .register(crate::CommandSpec::new("god").usage(

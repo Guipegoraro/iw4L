@@ -24,6 +24,7 @@ pub mod input;
 pub mod plugin;
 pub mod registry;
 pub mod suggest;
+mod timescale;
 mod user_settings;
 mod weapon_dispatch;
 
