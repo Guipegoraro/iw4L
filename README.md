@@ -27,6 +27,23 @@ The network side is for arranged playtests among people who already agreed to
 play; it has never been vetted for lobbies full of strangers. IW4L sends nothing
 home, and diagnostic files sit on your disk until you attach them to a report.
 
+## This fork
+
+Changes on top of upstream, newest last. Every change is recorded here.
+
+- **Windows test runs.** `cargo run -p approved_tests -- heavy_gameplay_lifecycle`
+  works on Windows (junction for the shared cache, `iw4l.exe`, newest log when
+  there is no `latest.log`). `IW4L_KEEP_CWD=1` stops the launcher moving into
+  its own folder.
+- **Agent workflow.** The coding agent works card by card (ordna board in
+  `context/board/`) and is told which skill comes next at each state:
+  grill → spec → tdd → code-review → commit. The rules live in
+  [`docs/agents/`](docs/agents/) (board as issue tracker, state → skill
+  table, glossary and ADR layout), on top of the
+  [mattpocock/skills](https://github.com/mattpocock/skills) set. A
+  session-start hook lists the cards in progress with their next step, and a
+  commit hook refuses code commits without their README bullet or card id.
+
 ## Architecture
 
 | | |
