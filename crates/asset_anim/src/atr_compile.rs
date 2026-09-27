@@ -35,6 +35,27 @@ pub(crate) fn compile_multiplayer(
     Ok(Arc::new(definition))
 }
 
+/// A whole `.atr` animtree compiled with every node kept: the AI trees
+/// (`generic_human.atr`) that scripts address by name rather than through a
+/// playeranim script.
+pub fn compile_complete(atr: &[u8]) -> Result<Arc<CompiledAnimTreeDefinition>, AtrCompileError> {
+    let mut parser = ComParser::new(atr);
+    let mut ignored = 0usize;
+    let (children, eof) = parse_internal(
+        &mut parser,
+        &HashSet::new(),
+        &mut ignored,
+        true,
+        false,
+        true,
+    )?;
+    if !eof {
+        return Err(parser.bad_token("bad token"));
+    }
+    let definition = flatten_tree(children, ignored, 0)?;
+    Ok(Arc::new(definition))
+}
+
 fn harvest_script_anim_names(script: &[u8], names: &mut HashSet<String>) {
     let mut parser = ComParser::new(script);
     loop {
@@ -114,7 +135,21 @@ fn parse_internal(
                     return Err(AtrCompileError::DuplicateAnimation { name });
                 }
                 let ignore = !complete && !names.contains(&name);
-                let on_line = parser.parse(false);
+                let mut on_line = parser.parse(false);
+                // Black Ops node settings, `combatrun[blend = 0.5]`: a node's
+                // default blend time, not used yet.
+                if on_line == "[" {
+                    loop {
+                        let token = parser.parse(false);
+                        if token == "]" {
+                            break;
+                        }
+                        if token.is_empty() {
+                            return Err(parser.bad_token("unclosed '['"));
+                        }
+                    }
+                    on_line = parser.parse(false);
+                }
                 if on_line.is_empty() {
                     current = Some(WorkAnim {
                         name,
@@ -254,6 +289,10 @@ fn parse_properties(parser: &mut ComParser<'_>) -> Result<u16, AtrCompileError> 
             Some(1) => flags |= ANIMFLAG_NONLOOPSYNC,
             Some(2) => flags |= ANIMFLAG_COMPLETE,
             Some(3) => flags |= ANIMFLAG_ADDITIVE,
+            // Black Ops trees also mark client-only subtrees (`faces : client
+            // separate`); neither changes how the server blends the tree.
+            None if token.eq_ignore_ascii_case("client")
+                || token.eq_ignore_ascii_case("separate") => {}
             _ => return Err(parser.bad_token("unknown anim property")),
         }
     }

@@ -211,6 +211,17 @@ fn default_topics() -> Vec<ModGuideTopic> {
             .line("In menus: D-pad moves, A picks, B goes back.")
             .line("Rebind like any key, e.g.  bind BUTTON_A +gostand ,")
             .line("or in Options > Controls by pressing the pad button."),
+        ModGuideTopic::new("zombies", "ZOMBIES (IN PROGRESS)")
+            .line("Black Ops zombie maps play the zombies mode, e.g.")
+            .line("map t5:zombie_cod5_prototype  (Nacht der Untoten).")
+            .line("")
+            .line("Everyone spawns with the Black Ops start loadout: M1911,")
+            .line("frag grenades and the knife. No class menu, no MW2 perks.")
+            .line("Co-op: all players are on one team and cannot hurt each other.")
+            .line("")
+            .line("Rounds spawn zombies at the map's spawners. For now they")
+            .line("stand in place: walking, attacks, damage, points and barriers")
+            .line("are still being ported from the original scripts."),
         ModGuideTopic::new("commands", "COMMANDS")
             .line("Open the console with the ` key. Added by this fork:")
             .line("")

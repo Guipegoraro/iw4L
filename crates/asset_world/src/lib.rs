@@ -8,6 +8,7 @@ mod dyn_ents;
 mod glass_catalog;
 mod map_entities;
 pub mod model_mesh;
+pub mod path_nodes_t5;
 mod vision;
 pub mod world_draw;
 pub mod world_iw5;

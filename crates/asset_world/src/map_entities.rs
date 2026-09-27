@@ -621,6 +621,28 @@ fn entity_string_pair_kind(line: &str) -> Option<&'static str> {
     }
 }
 
+/// The map's `node_*` entities (path, cover, negotiation nodes), classname
+/// and origin, as the level designer placed them; the compiled `PathData`
+/// carries the same nodes with their links.
+pub fn node_entities_t5(s: &fastfile_t5::ZoneStream<'_>) -> Vec<(String, [f32; 3])> {
+    let Some(text) = entity_string_t5(s) else {
+        return Vec::new();
+    };
+    parse_entities(text)
+        .filter_map(|e| {
+            let classname = e.classname?;
+            classname
+                .starts_with("node_")
+                .then_some((classname.to_owned(), e.origin?))
+        })
+        .collect()
+}
+
+/// A Black Ops map zone's entity string, as the map's scripts query it.
+pub fn map_entity_text_t5(s: &fastfile_t5::ZoneStream<'_>) -> Option<String> {
+    entity_string_t5(s).map(|text| text.trim_end_matches(' ').to_owned())
+}
+
 fn entity_string_t5<'a>(s: &'a fastfile_t5::ZoneStream<'_>) -> Option<&'a str> {
     let map_ents = s.map_ents()?;
     let ptr = map_ents.entity_string?;

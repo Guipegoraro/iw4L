@@ -61,6 +61,7 @@ pub mod use_notify;
 pub mod use_prox;
 pub mod visuals;
 pub mod weapons;
+pub mod zom;
 
 pub use animated_models::{
     ANIM_PROP_MODELS, ANIMATED_MODEL_TARGETNAME, AnimPropModel, FAN_BLADE_AXIS_DOT,

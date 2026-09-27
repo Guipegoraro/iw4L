@@ -419,3 +419,36 @@ pub fn read_basemaps_arena(games_root: &Path) -> Option<String> {
 pub fn read_iwd_named(games_root: &Path, want: &str) -> Option<Vec<u8>> {
     asset_transport::read_iwd_named(games_root, want)
 }
+
+const ZOMBIEMODE_MAIN_CALL: &[u8] = b"_zombiemode::main(";
+
+/// A map is a zombies map when its level script calls `_zombiemode::main()`,
+/// as every retail zombies map does from its `main()`; a custom map opts in the
+/// same way. GSC names are case-insensitive, and a call inside a comment does
+/// not count.
+#[must_use]
+pub fn t5_map_runs_zombiemode(script: &str) -> bool {
+    let bytes = script.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i..].starts_with(b"//") {
+            i += bytes[i..]
+                .iter()
+                .position(|&b| b == b'\n')
+                .unwrap_or(bytes.len() - i);
+        } else if bytes[i..].starts_with(b"/*") {
+            i += bytes[i + 2..]
+                .windows(2)
+                .position(|w| w == b"*/")
+                .map_or(bytes.len() - i, |end| end + 4);
+        } else if bytes[i..]
+            .get(..ZOMBIEMODE_MAIN_CALL.len())
+            .is_some_and(|window| window.eq_ignore_ascii_case(ZOMBIEMODE_MAIN_CALL))
+        {
+            return true;
+        } else {
+            i += 1;
+        }
+    }
+    false
+}

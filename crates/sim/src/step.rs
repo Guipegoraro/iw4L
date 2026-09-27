@@ -48,6 +48,7 @@ pub(crate) fn schedule() -> Schedule {
             record_collision_state_system,
             run_entity_types_system,
             dispatch_touches_system,
+            run_mode_script_system,
             finalize_system,
             publish_snapshot_system,
         )
@@ -884,6 +885,25 @@ fn run_entity_types_system(ecs: &mut World) {
     } else {
         crate::entity_run::phase_walk_entity_thinks(&mut world);
     }
+}
+
+/// The mode's script threads, once per authoritative (or replayed) frame.
+/// Prediction never runs them: clients see their effects in snapshots.
+fn run_mode_script_system(ecs: &mut World) {
+    let request = ecs.resource::<StepRequest>();
+    let (tick, reason) = (request.tick, request.reason);
+    if !(reason.advances_authority_world() || reason.is_replay()) {
+        return;
+    }
+    let mut world = frame_world(ecs);
+    let Some(mut script) = world.mode_script_mut().take() else {
+        return;
+    };
+    {
+        let mut engine = crate::mode_script::ModeEngine::new(&mut world, tick);
+        script.frame(&mut engine);
+    }
+    world.mode_script_mut().put(script);
 }
 
 fn dispatch_touches_system(ecs: &mut World) {
@@ -2041,11 +2061,16 @@ fn apply_select_class(
     class_id: crate::ClassId,
     revision: u32,
 ) {
-    let accepted = world
-        .bootstrap_ref()
-        .class(class_id)
-        .filter(|def| def.revision == revision)
-        .cloned();
+    let accepted = if world.bootstrap_ref().kind == gamemode_iw4::GameModeKind::Zombies {
+        // Zombies has one loadout, the map's start loadout, whatever was asked.
+        world.bootstrap_ref().classes.first().cloned()
+    } else {
+        world
+            .bootstrap_ref()
+            .class(class_id)
+            .filter(|def| def.revision == revision)
+            .cloned()
+    };
     let Some(def) = accepted else {
         diag::info!(
             Sim,
@@ -2163,7 +2188,12 @@ fn apply_select_class(
 }
 
 fn assign_team(world: &mut FrameWorld, id: ClientId) {
-    if world.bootstrap_ref().kind.is_team() {
+    if world.bootstrap_ref().kind == gamemode_iw4::GameModeKind::Zombies {
+        // Every player fights on one side; zombies are not a team.
+        let meta = world.client_meta_mut(id);
+        meta.client_state_team = entity_iw4::TEAM_ALLIES;
+        meta.ffa_team = None;
+    } else if world.bootstrap_ref().kind.is_team() {
         assign_session_team(world, id);
     } else {
         assign_ffa_team(world, id);

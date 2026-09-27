@@ -229,8 +229,10 @@ fn advance_prematch(world: &mut FrameWorld, tick: Tick) {
         .count() as u32;
     world.bump_max_alive_seen(alive);
     // Alone in the match: there is nobody to wait for or count down with, so
-    // play at once. Whoever joins later joins a match in progress.
-    if alive == 1 && world.clients_scoreboard().len() == 1 {
+    // play at once. Whoever joins later joins a match in progress. Zombies has
+    // no MP prematch at all; its own round start paces the first round.
+    let zombies = world.bootstrap_ref().kind == gamemode_iw4::GameModeKind::Zombies;
+    if (alive == 1 && world.clients_scoreboard().len() == 1) || (zombies && alive >= 1) {
         world.set_prematch(PrematchStep::Done);
         finish_prematch(world, tick);
         return;

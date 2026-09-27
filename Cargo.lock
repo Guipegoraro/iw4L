@@ -204,10 +204,14 @@ name = "approved_tests"
 version = "0.1.0"
 dependencies = [
  "asset_transport",
+ "gsc_threads",
  "movement_iw4",
+ "pathnodes",
  "playerstate_iw4",
  "serde_json",
+ "sim",
  "trace_iw4",
+ "zombiemode_t5",
 ]
 
 [[package]]
@@ -457,6 +461,7 @@ dependencies = [
  "fx_iw4",
  "libc",
  "lighting_iw4",
+ "pathnodes",
  "png",
  "render_material",
  "serde_json",
@@ -3249,6 +3254,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b40ca9252762c466af32d0b1002e91e4e1bc5398f77455e55474deb466355ff5"
 
 [[package]]
+name = "gsc_threads"
+version = "0.1.0"
+
+[[package]]
 name = "guillotiere"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4749,6 +4758,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
+name = "pathnodes"
+version = "0.1.0"
+
+[[package]]
 name = "percent-encoding"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5811,6 +5824,7 @@ dependencies = [
  "render_frontend",
  "render_fx",
  "sim",
+ "zombiemode_t5",
 ]
 
 [[package]]
@@ -6583,6 +6597,7 @@ dependencies = [
  "bevy",
  "diag",
  "frame",
+ "gamemode_iw4",
  "net",
  "session",
  "sim",
@@ -7669,6 +7684,16 @@ name = "zmij"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b"
+
+[[package]]
+name = "zombiemode_t5"
+version = "0.1.0"
+dependencies = [
+ "diag",
+ "gsc_threads",
+ "pathnodes",
+ "sim",
+]
 
 [[package]]
 name = "zopfli"

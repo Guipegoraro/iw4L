@@ -1,4 +1,4 @@
-use crate::{dd, dom, ffa};
+use crate::{dd, dom, ffa, zom};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 #[repr(u8)]
@@ -9,6 +9,8 @@ pub enum GameModeKind {
     Demolition = 1,
 
     Domination = 2,
+
+    Zombies = 3,
 }
 
 impl GameModeKind {
@@ -20,6 +22,7 @@ impl GameModeKind {
 
             b"dd" | b"dem" | b"demolition" => Some(Self::Demolition),
             b"dom" | b"domination" => Some(Self::Domination),
+            b"zom" | b"zombies" => Some(Self::Zombies),
             _ => None,
         }
     }
@@ -41,6 +44,7 @@ impl GameModeKind {
             Self::FreeForAll => ffa::GAMETYPE_TOKEN,
             Self::Demolition => dd::GAMETYPE_TOKEN,
             Self::Domination => dom::GAMETYPE_TOKEN,
+            Self::Zombies => zom::GAMETYPE_TOKEN,
         }
     }
 
@@ -53,6 +57,7 @@ impl GameModeKind {
             0 => Some(Self::FreeForAll),
             1 => Some(Self::Demolition),
             2 => Some(Self::Domination),
+            3 => Some(Self::Zombies),
             _ => None,
         }
     }
@@ -62,6 +67,7 @@ impl GameModeKind {
             Self::FreeForAll => ffa::DISPLAY_NAME,
             Self::Demolition => dd::DISPLAY_NAME,
             Self::Domination => dom::DISPLAY_NAME,
+            Self::Zombies => zom::DISPLAY_NAME,
         }
     }
 
@@ -72,6 +78,7 @@ impl GameModeKind {
     pub fn team_start_classname(self, axis: bool) -> Option<&'static str> {
         match self {
             Self::FreeForAll => None,
+            Self::Zombies => Some(ffa::START_SPAWN_CLASSNAME),
             Self::Domination => Some(if axis {
                 dom::START_SPAWN_AXIS
             } else {
@@ -88,6 +95,7 @@ impl GameModeKind {
     pub fn team_grid_classnames(self, axis: bool) -> &'static [&'static str] {
         match self {
             Self::FreeForAll => &[],
+            Self::Zombies => &[ffa::SPAWN_CLASSNAME],
             Self::Domination => &[dom::SPAWN_CLASSNAME],
             Self::Demolition => {
                 if axis {

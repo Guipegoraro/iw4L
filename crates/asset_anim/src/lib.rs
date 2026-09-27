@@ -5,6 +5,7 @@ mod playeranim_parse;
 mod xanim_catalog;
 
 pub use animtree::*;
+pub use atr_compile::compile_complete as compile_animtree_complete;
 pub use asset_core::*;
 pub use clip_scheduler::*;
 pub use playeranim_parse::*;

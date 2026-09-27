@@ -311,6 +311,7 @@ pub struct ZoneStream<'a> {
     gfx_world: Option<GfxWorldGeometry>,
     clip_map: Option<ClipMapGeometry>,
     map_ents: Option<MapEntsGeometry>,
+    path_data: Option<PathDataGeometry>,
     com_world: Option<ComWorldGeometry>,
     light_defs: [GfxLightDefGeometry; 128],
     light_def_count: usize,
@@ -453,6 +454,21 @@ pub struct XAnimPartsGeometry {
     pub random_data_int_count: usize,
     pub indices: Option<Ptr>,
     pub index_count: usize,
+    pub indices_are_bytes: bool,
+    /// The root's translation over the clip (`XAnimDeltaPart::trans`).
+    pub delta_trans: XAnimDeltaTransGeometry,
+}
+
+/// `XAnimPartTrans` of the delta part, where it landed: one constant vector,
+/// or `mins`/`size` with packed frames and frame indices.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct XAnimDeltaTransGeometry {
+    pub size: u16,
+    pub small: u8,
+    pub constant: Option<Ptr>,
+    pub mins_step: Option<Ptr>,
+    pub frames: Option<Ptr>,
+    pub indices: Option<Ptr>,
     pub indices_are_bytes: bool,
 }
 
@@ -610,6 +626,13 @@ pub struct ClipMapGeometry {
 pub struct MapEntsGeometry {
     pub entity_string: Option<Ptr>,
     pub entity_chars: usize,
+}
+
+/// `GameWorldSp`/`GameWorldMp` `PathData`: where its node array landed.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PathDataGeometry {
+    pub nodes: Option<Ptr>,
+    pub node_count: usize,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -861,6 +884,7 @@ impl<'a> ZoneStream<'a> {
             gfx_world: None,
             clip_map: None,
             map_ents: None,
+            path_data: None,
             com_world: None,
             light_defs: [GfxLightDefGeometry {
                 name: None,
@@ -923,6 +947,14 @@ impl<'a> ZoneStream<'a> {
 
     pub fn map_ents(&self) -> Option<MapEntsGeometry> {
         self.map_ents
+    }
+
+    pub fn record_path_data(&mut self, geometry: PathDataGeometry) {
+        self.path_data = Some(geometry);
+    }
+
+    pub fn path_data(&self) -> Option<PathDataGeometry> {
+        self.path_data
     }
 
     pub fn record_com_world(&mut self, geometry: ComWorldGeometry) {

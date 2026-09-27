@@ -43,6 +43,25 @@ pub struct MapFacts {
     pub team_settings: crate::MapTeamSettings,
 
     pub t5_teamset: Option<String>,
+
+    /// The level script calls `_zombiemode::main()`: the map plays Black Ops
+    /// zombies (`zombiemode_t5`).
+    pub zombiemode: bool,
+
+    /// String tables the map's scripts read (`TableLookUp`), by name, as CSV:
+    /// for a zombies map, those of its companion zones (`common_zombie`, its
+    /// patch, the map's patch), a later zone overriding an earlier one.
+    pub string_tables: std::collections::BTreeMap<String, String>,
+
+    /// The map's compiled path nodes and links (`PathData`); empty on maps
+    /// without AI paths.
+    pub path_graph: std::sync::Arc<pathnodes::PathGraph>,
+    /// A zombies map's entity string (spawners, zones, barriers), which its
+    /// scripts look things up in; empty on other maps.
+    pub map_entities: std::sync::Arc<str>,
+
+    /// Animtree sources (`animtrees/*.atr`) the map's AI uses, by name.
+    pub anim_trees: std::collections::BTreeMap<String, String>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]

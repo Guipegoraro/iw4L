@@ -1,3 +1,5 @@
+> **Note:** this fork is "vibe coded AI slop made for fun".
+
 # IW4L
 
 <p align="center">
@@ -113,12 +115,30 @@ Changes on top of upstream, newest last. Every change is recorded here.
   search roots. Then `map t5:mp_nuked` (any `t5:mp_*` map) loads a BO1
   multiplayer map and `give t5:famas`, `give t5:commando`, … hand out BO1
   guns, also on MW2 maps. Zombie maps load as a walkable level:
-  `map t5:zombie_theater` (Kino der Toten) puts you on the map's
-  `initial_spawn_points` (or `info_player_start`) in a free-for-all. There
-  are no zombies yet (the zombies rules are being ported to Rust), and
-  surfaces whose materials live in the zombie companion zones show as a
-  checkerboard. Static models whose model is not in the map's own zone are
-  left out of collision and counted in the load report.
+  `map t5:zombie_cod5_prototype` (Nacht der Untoten, the first map the
+  zombies port targets) or `map t5:zombie_theater` (Kino der Toten) puts you on the map's
+  `initial_spawn_points` (or `info_player_start`) in the zombies mode: a map
+  whose level script calls `_zombiemode::main()` (every zombie map, and a
+  custom map that opts in the same way) plays zombies whatever mode was
+  picked. There is no class menu: everyone spawns with the Black Ops start
+  loadout (M1911, frag grenades, knife) on one team, so co-op players cannot
+  hurt each other, and there is no MP pre-match countdown. The zombies rules
+  live in the `zombiemode_t5` crate, one module per original script file.
+  Rounds now spawn zombies on Nacht: the zone manager picks the spawners of
+  the start zone, and each zombie wears a body and head picked from the
+  map's character script (the same bodies and heads the original draws).
+  For now they stand at their spawners playing the walk cycle: they
+  do not move, attack or take damage yet, and their heads draw dark (the
+  character skin shader is not loaded yet). Zombies are server entities, so
+  co-op players see the same ones.
+  World surfaces with Black Ops terrain-scorch techniques (`*_sco`, most of
+  Nacht's walls and floors) draw with their real materials, never scorched:
+  IW4L has no scorch system, so the runtime scorch vertex stream is left
+  unrouted and the scorch texture is the engine's black. A few surfaces
+  still show as a checkerboard (Kino's banners), and so do the zombie
+  characters, whose materials live in the zombie companion zones. Static
+  models whose model is not in the map's own zone are left out of collision
+  and counted in the load report.
 - **Export a zone's raw files.** `iw4l export-rawfiles t5:<zone>` writes every
   raw file of a Black Ops zone (GSC/CSC scripts, aitype and character scripts,
   configs) to `iw4l-artifacts/rawfiles/<zone>/`, unpacking the compressed

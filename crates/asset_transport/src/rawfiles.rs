@@ -18,8 +18,31 @@ pub struct RawFileExport {
     pub bytes: usize,
 }
 
-/// Export the raw files of a Black Ops (T5) zone into `out_dir`.
-pub fn export_t5_rawfiles(zone: &Path, out_dir: &Path) -> Result<RawFileExport, String> {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RawFileKind {
+    /// A rawfile: script source (unpacked when it was zlib-packed), config.
+    Raw { inflated: bool },
+    /// A string table, as CSV.
+    StringTable,
+}
+
+#[derive(Clone, Debug)]
+pub struct RawFileEntry {
+    pub name: String,
+    pub kind: RawFileKind,
+    pub body: Vec<u8>,
+}
+
+/// A Black Ops (T5) zone's raw files and string tables, in zone order, plus its
+/// entity string when it is a map zone.
+#[derive(Clone, Debug, Default)]
+pub struct ZoneRawFiles {
+    pub files: Vec<RawFileEntry>,
+    pub map_ents: Option<Vec<u8>>,
+}
+
+/// Reads the raw files of a Black Ops (T5) zone into memory.
+pub fn read_t5_rawfiles(zone: &Path) -> Result<ZoneRawFiles, String> {
     let image = crate::open_zone(zone).map_err(|e| format!("{}: {e:?}", zone.display()))?;
     let header = image
         .t5_header()
@@ -28,31 +51,55 @@ pub fn export_t5_rawfiles(zone: &Path, out_dir: &Path) -> Result<RawFileExport, 
     let mut stream = memory
         .stream(&image.bytes)
         .map_err(|e| format!("{}: {e:?}", zone.display()))?;
-    let mut sink = RawFileSink {
-        out_dir: out_dir.to_path_buf(),
-        export: RawFileExport::default(),
-        error: None,
-    };
+    let mut sink = RawFileSink::default();
     fastfile_t5::load_zone(&mut stream, &mut sink)
         .map_err(|e| format!("{}: walk stopped: {e:?}", zone.display()))?;
-    // A map zone's entity string (spawners, zones, doors, structs), as
-    // `mapents.txt`: the map's half of what its scripts look up.
-    let entities = stream.map_ents().and_then(|ents| {
+    // A map zone's entity string (spawners, zones, doors, structs): the map's
+    // half of what its scripts look up.
+    let map_ents = stream.map_ents().and_then(|ents| {
         let text = ents.entity_string?;
-        stream.slice_at(text, 0, ents.entity_chars).ok()
+        let text = stream.slice_at(text, 0, ents.entity_chars).ok()?;
+        Some(text.strip_suffix(&[0]).unwrap_or(text).to_vec())
     });
-    if let Some(text) = entities {
-        let text = text.strip_suffix(&[0]).unwrap_or(text);
-        std::fs::create_dir_all(out_dir)
-            .and_then(|()| std::fs::write(out_dir.join("mapents.txt"), text))
-            .map_err(|e| format!("{}: {e}", out_dir.display()))?;
-        sink.export.files += 1;
-        sink.export.bytes += text.len();
+    Ok(ZoneRawFiles {
+        files: sink.files,
+        map_ents,
+    })
+}
+
+/// Export the raw files of a Black Ops (T5) zone into `out_dir`; a map zone
+/// also gives `mapents.txt`.
+pub fn export_t5_rawfiles(zone: &Path, out_dir: &Path) -> Result<RawFileExport, String> {
+    let read = read_t5_rawfiles(zone)?;
+    let mut export = RawFileExport::default();
+    let mut write = |name: &str, body: &[u8]| -> Result<(), String> {
+        // Zone names use `/` or `\`; keep them inside the output folder.
+        let relative: PathBuf = name
+            .split(['/', '\\'])
+            .filter(|part| !part.is_empty() && *part != "..")
+            .map(|part| part.replace(':', "_"))
+            .collect();
+        let out = out_dir.join(relative);
+        out.parent()
+            .map_or(Ok(()), std::fs::create_dir_all)
+            .and_then(|()| std::fs::write(&out, body))
+            .map_err(|error| format!("{}: {error}", out.display()))?;
+        export.files += 1;
+        export.bytes += body.len();
+        Ok(())
+    };
+    for file in &read.files {
+        write(&file.name, &file.body)?;
     }
-    match sink.error {
-        Some(error) => Err(error),
-        None => Ok(sink.export),
+    if let Some(text) = &read.map_ents {
+        write("mapents.txt", text)?;
     }
+    export.inflated = read
+        .files
+        .iter()
+        .filter(|file| file.kind == RawFileKind::Raw { inflated: true })
+        .count();
+    Ok(export)
 }
 
 /// A packed script: an 8-byte size prefix, then a zlib stream.
@@ -64,10 +111,9 @@ fn unpack(data: &[u8]) -> Option<Vec<u8>> {
     crate::iwd::inflate_zlib(body).ok()
 }
 
+#[derive(Default)]
 struct RawFileSink {
-    out_dir: PathBuf,
-    export: RawFileExport,
-    error: Option<String>,
+    files: Vec<RawFileEntry>,
 }
 
 impl AssetSink for RawFileSink {
@@ -102,32 +148,13 @@ impl AssetLinkSink for RawFileSink {
     /// String tables (`mp/zombiemode.csv`, weapon and perk tables) come back
     /// out as CSV.
     fn capture_string_table(&mut self, s: &ZoneStream<'_>, header: Ptr) -> fastfile_t5::Result<()> {
-        let text_at = |slot: Ptr| match s.ptr_at(slot, 0) {
-            Ok(ZonePtr::Offset(p)) => s.cstr(s.resolve_alias(p)).unwrap_or("").to_owned(),
-            _ => String::new(),
-        };
-        let name = text_at(header);
-        if name.is_empty() {
-            return Ok(());
+        if let Some((name, csv)) = string_table_csv(s, header) {
+            self.files.push(RawFileEntry {
+                name,
+                kind: RawFileKind::StringTable,
+                body: csv.into_bytes(),
+            });
         }
-        let columns = s.i32_at(header, 4).unwrap_or(0).max(0) as usize;
-        let rows = s.i32_at(header, 8).unwrap_or(0).max(0) as usize;
-        let mut csv = String::new();
-        if let Ok(ZonePtr::Offset(cells)) = s.ptr_at(header, 12) {
-            let cells = s.resolve_alias(cells);
-            for row in 0..rows {
-                let line: Vec<_> = (0..columns)
-                    .map(|col| {
-                        let cell =
-                            cells.at((row * columns + col) * fastfile_t5::size::STRING_TABLE_CELL);
-                        text_at(cell)
-                    })
-                    .collect();
-                csv.push_str(&line.join(","));
-                csv.push('\n');
-            }
-        }
-        self.write(&name, csv.as_bytes(), false);
         Ok(())
     }
 
@@ -139,38 +166,44 @@ impl AssetLinkSink for RawFileSink {
     ) -> fastfile_t5::Result<()> {
         let data = data.strip_suffix(&[0]).unwrap_or(data);
         let unpacked = unpack(data);
-        self.write(
-            name,
-            unpacked.as_deref().unwrap_or(data),
-            unpacked.is_some(),
-        );
+        self.files.push(RawFileEntry {
+            name: name.to_owned(),
+            kind: RawFileKind::Raw {
+                inflated: unpacked.is_some(),
+            },
+            body: unpacked.unwrap_or_else(|| data.to_vec()),
+        });
         Ok(())
     }
 }
 
-impl RawFileSink {
-    fn write(&mut self, name: &str, body: &[u8], inflated: bool) {
-        // Zone names use `/` or `\`; keep them inside the output folder.
-        let relative: PathBuf = name
-            .split(['/', '\\'])
-            .filter(|part| !part.is_empty() && *part != "..")
-            .map(|part| part.replace(':', "_"))
-            .collect();
-        let out = self.out_dir.join(relative);
-        let written = out
-            .parent()
-            .map_or(Ok(()), std::fs::create_dir_all)
-            .and_then(|()| std::fs::write(&out, body));
-        match written {
-            Ok(()) => {
-                self.export.files += 1;
-                self.export.inflated += usize::from(inflated);
-                self.export.bytes += body.len();
-            }
-            Err(error) if self.error.is_none() => {
-                self.error = Some(format!("{}: {error}", out.display()));
-            }
-            Err(_) => {}
+/// A T5 `StringTable` asset as `(name, CSV)`: one line per row, cells joined
+/// with `,`.
+pub fn string_table_csv(s: &ZoneStream<'_>, header: Ptr) -> Option<(String, String)> {
+    let text_at = |slot: Ptr| match s.ptr_at(slot, 0) {
+        Ok(ZonePtr::Offset(p)) => s.cstr(s.resolve_alias(p)).unwrap_or("").to_owned(),
+        _ => String::new(),
+    };
+    let name = text_at(header);
+    if name.is_empty() {
+        return None;
+    }
+    let columns = s.i32_at(header, 4).unwrap_or(0).max(0) as usize;
+    let rows = s.i32_at(header, 8).unwrap_or(0).max(0) as usize;
+    let mut csv = String::new();
+    if let Ok(ZonePtr::Offset(cells)) = s.ptr_at(header, 12) {
+        let cells = s.resolve_alias(cells);
+        for row in 0..rows {
+            let line: Vec<_> = (0..columns)
+                .map(|col| {
+                    let cell =
+                        cells.at((row * columns + col) * fastfile_t5::size::STRING_TABLE_CELL);
+                    text_at(cell)
+                })
+                .collect();
+            csv.push_str(&line.join(","));
+            csv.push('\n');
         }
     }
+    Some((name, csv))
 }

@@ -7,6 +7,7 @@ pub const fn allowed_after_main(kind: GameModeKind) -> &'static [&'static str] {
         GameModeKind::FreeForAll => &["dm", AIRDROP_PALLET],
         GameModeKind::Demolition => &["dd", "bombzone", "blocker", AIRDROP_PALLET],
         GameModeKind::Domination => &["dom", AIRDROP_PALLET],
+        GameModeKind::Zombies => &[],
     }
 }
 

@@ -104,6 +104,19 @@ pub fn sync_class_change_allowed(
         }
         return;
     }
+    if presented
+        .snapshot()
+        .is_some_and(|s| s.meta.kind == gamemode_iw4::GameModeKind::Zombies)
+    {
+        let reason = "class change not allowed (zombies has one loadout)";
+        if allowed.0 {
+            allowed.0 = false;
+        }
+        if block.0.as_deref() != Some(reason) {
+            block.0 = Some(reason.to_owned());
+        }
+        return;
+    }
     let (next_allowed, reason) = match presented
         .snapshot()
         .and_then(|s| s.meta.for_client(local.0))
@@ -193,6 +206,7 @@ pub(crate) fn register_equip_systems(app: &mut App) {
             consume_class_select_handoff,
             publish_signon_class_status,
             sync_class_change_allowed,
+            equip_single_loadout_mode.before(apply_pending_class_equip),
             apply_pending_class_equip,
         )
             .in_set(ClientSet::Present),
@@ -265,4 +279,54 @@ fn reset_equip_transaction(
     pending.0 = None;
     *phase = ClassSelectPhase::default();
     status.0 = None;
+}
+
+/// Zombies has one loadout and no class menu: once the local client has
+/// joined, equip it without waiting for a pick.
+#[allow(clippy::too_many_arguments)]
+fn equip_single_loadout_mode(
+    screen: Res<frame::AppScreen>,
+    presented: Res<PresentedSnapshot>,
+    local: Res<LocalPresentClient>,
+    signon: Option<Res<net::SignonState>>,
+    mut store: ResMut<SessionClassStore>,
+    mut highlight: ResMut<crate::class_select::ClassSelectHighlight>,
+    mut phase: ResMut<ClassSelectPhase>,
+    mut pending: ResMut<PendingClassEquip>,
+    mut status: ResMut<ClassSelectStatus>,
+    mut seq: ResMut<net::ActionRequestIds>,
+) {
+    if !matches!(*screen, frame::AppScreen::ClassSelect)
+        || phase.is_pending()
+        || pending.0.is_some()
+        || signon.is_some_and(|signon| !signon.may_select_class())
+    {
+        return;
+    }
+    let Some(snapshot) = presented.snapshot() else {
+        return;
+    };
+    if snapshot.meta.kind != gamemode_iw4::GameModeKind::Zombies
+        || snapshot.meta.for_client(local.0).is_none()
+    {
+        return;
+    }
+    match crate::class_select::commit_class_equip(
+        0,
+        &mut store,
+        &mut highlight,
+        &mut phase,
+        &mut pending,
+        &mut status,
+        &mut seq,
+    ) {
+        Ok(request_id) => diag::info!(
+            Ui,
+            "class select: zombies start loadout request_id={request_id}"
+        ),
+        Err(refusal) => diag::info!(
+            Ui,
+            "class select: zombies start loadout refused — {refusal}"
+        ),
+    }
 }

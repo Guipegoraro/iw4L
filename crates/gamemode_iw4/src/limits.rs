@@ -32,6 +32,12 @@ impl MatchLimits {
                 round_limit: Some(dd::ROUND_LIMIT),
                 time_limit_ms: Some(dd::TIME_LIMIT_MS),
             },
+            GameModeKind::Zombies => Self {
+                score_limit: None,
+                win_limit: None,
+                round_limit: None,
+                time_limit_ms: None,
+            },
         }
     }
 
@@ -49,6 +55,7 @@ pub fn blurb(kind: GameModeKind) -> &'static str {
         GameModeKind::FreeForAll => "First to 1000 — or 10 minutes",
         GameModeKind::Domination => "Hold flags — 300 wins",
         GameModeKind::Demolition => "Plant both sites — first to 2",
+        GameModeKind::Zombies => "Survive the rounds together",
     }
 }
 

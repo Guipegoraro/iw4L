@@ -37,7 +37,8 @@ and leaves transport to `net`.
 
 * `sim/` — `gentity spawn world snapshot damage bullet* missile item corpse
   match_state score rules world_objects identities` (`ScriptModelId` is the one
-  identity of a script model; a raw `u32` is not a second one);
+  identity of a script model; a raw `u32` is not a second one) `mode_script`
+  `actors` (a GSC port run after touches; actors are movers with a DObj);
 * `frame` — `AppScreen`, `HasWorld`, `RuntimeRole`, `LaunchIdentity`; no
   plugins, no systems;
 * `session` — standing the match up and tearing it down (`MatchInstalled` /

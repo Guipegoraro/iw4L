@@ -1,6 +1,9 @@
 use super::{AssetLinkSink, always_array, follow_name};
 use crate::size as sz;
-use crate::zone::{Ptr, Result, XAnimPartsGeometry, XFILE_BLOCK_VIRTUAL, ZonePtr, ZoneStream};
+use crate::zone::{
+    Ptr, Result, XAnimDeltaTransGeometry, XAnimPartsGeometry, XFILE_BLOCK_VIRTUAL, ZonePtr,
+    ZoneStream,
+};
 
 pub(super) fn load_xanim_parts(
     s: &mut ZoneStream<'_>,
@@ -14,6 +17,7 @@ pub(super) fn load_xanim_parts(
     let random_data_int = s.u16_at(p, 0xc)? as usize;
     let numframes = s.u16_at(p, 0xe)?;
     let b_loop = s.u8_at(p, 0x10)?;
+    let b_delta = s.u8_at(p, 0x11)?;
     let mut bone_count = [0u8; 10];
     for (i, b) in bone_count.iter_mut().enumerate() {
         *b = s.u8_at(p, 0x18 + i)?;
@@ -37,9 +41,11 @@ pub(super) fn load_xanim_parts(
         sz::XANIM_NOTIFY_INFO * notify_count,
     )?;
 
-    if let Some(delta) = always_array(s, p.at(sz::XANIM_DELTA_PART_OFF), 4, sz::XANIM_DELTA_PART)? {
-        load_delta_part(s, delta, numframes as usize)?;
-    }
+    let delta_trans =
+        match always_array(s, p.at(sz::XANIM_DELTA_PART_OFF), 4, sz::XANIM_DELTA_PART)? {
+            Some(delta) => load_delta_part(s, delta, numframes as usize)?,
+            None => XAnimDeltaTransGeometry::default(),
+        };
 
     let data_byte_ptr = always_array(s, p.at(sz::XANIM_DATA_BYTE_OFF), 1, data_byte)?;
     let data_short_ptr = always_array(s, p.at(sz::XANIM_DATA_SHORT_OFF), 2, 2 * data_short)?;
@@ -75,7 +81,8 @@ pub(super) fn load_xanim_parts(
             name,
             numframes,
 
-            flags: if b_loop != 0 { 1 } else { 0 },
+            // IW4's flag bits: 0x1 loops, 0x2 carries a delta (root motion) part.
+            flags: u8::from(b_loop != 0) | (u8::from(b_delta != 0) << 1),
             bone_count,
             notify_count,
             framerate,
@@ -97,6 +104,7 @@ pub(super) fn load_xanim_parts(
             indices,
             index_count,
             indices_are_bytes: numframes < 256,
+            delta_trans,
         },
     )?;
     s.pop()
@@ -115,10 +123,14 @@ fn load_indices(
     }
 }
 
-fn load_delta_part(s: &mut ZoneStream<'_>, p: Ptr, numframes: usize) -> Result<()> {
-    load_part_trans(s, p.at(0), numframes)?;
+fn load_delta_part(
+    s: &mut ZoneStream<'_>,
+    p: Ptr,
+    numframes: usize,
+) -> Result<XAnimDeltaTransGeometry> {
+    let trans = load_part_trans(s, p.at(0), numframes)?;
     load_delta_quat(s, p.at(4), numframes)?;
-    Ok(())
+    Ok(trans)
 }
 
 fn indices_bytes(size: usize, numframes: usize) -> usize {
@@ -126,9 +138,13 @@ fn indices_bytes(size: usize, numframes: usize) -> usize {
     if numframes >= 0x100 { 2 * n } else { n }
 }
 
-fn load_part_trans(s: &mut ZoneStream<'_>, slot: Ptr, numframes: usize) -> Result<()> {
+fn load_part_trans(
+    s: &mut ZoneStream<'_>,
+    slot: Ptr,
+    numframes: usize,
+) -> Result<XAnimDeltaTransGeometry> {
     if !super::always_alloc(s, slot)? {
-        return Ok(());
+        return Ok(XAnimDeltaTransGeometry::default());
     }
 
     s.align_pos(4)?;
@@ -149,10 +165,28 @@ fn load_part_trans(s: &mut ZoneStream<'_>, slot: Ptr, numframes: usize) -> Resul
     };
     let body = s.alloc_load(1, total)?;
     s.fixup_slot(slot, body)?;
-    if size != 0 {
-        load_dynamic_frames(s, body.at(28), size, small_trans)?;
+    if size == 0 {
+        return Ok(XAnimDeltaTransGeometry {
+            size: 0,
+            small: small_trans,
+            constant: Some(body.at(4)),
+            ..XAnimDeltaTransGeometry::default()
+        });
     }
-    Ok(())
+    load_dynamic_frames(s, body.at(28), size, small_trans)?;
+    let frames = match s.ptr_at(body, 28)? {
+        ZonePtr::Offset(frames) => Some(s.resolve_alias(frames)),
+        _ => None,
+    };
+    Ok(XAnimDeltaTransGeometry {
+        size: size as u16,
+        small: small_trans,
+        constant: None,
+        mins_step: Some(body.at(4)),
+        frames,
+        indices: Some(body.at(32)),
+        indices_are_bytes: numframes < 0x100,
+    })
 }
 
 fn load_delta_quat(s: &mut ZoneStream<'_>, slot: Ptr, numframes: usize) -> Result<()> {

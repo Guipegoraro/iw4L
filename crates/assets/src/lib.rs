@@ -182,8 +182,9 @@ pub use animtree::{
 pub use arena::{
     ArenaCharsets, FACTION_ICON_COL, MapTeamSettings, SessionTeamSettings, arena_charsets,
     load_iw5_team_sources, parse_arena, read_basemaps_arena, read_iwd_named,
-    t5_settings_from_teamset_gsc, t5_settings_from_teamset_rawfile, t5_teamset_from_map_gsc,
-    t5_teamset_from_rawfile, t5_teamset_key_from_rawfile, team_settings, team_settings_for_zone,
+    t5_map_runs_zombiemode, t5_settings_from_teamset_gsc, t5_settings_from_teamset_rawfile,
+    t5_teamset_from_map_gsc, t5_teamset_from_rawfile, t5_teamset_key_from_rawfile, team_settings,
+    team_settings_for_zone,
 };
 pub use artifact_cache::{cache_flight, cache_get, cache_put, fnv1a64, fnv1a64_more};
 pub use asset_core::{
@@ -212,6 +213,9 @@ pub use asset_iw4::{
     polygon_offset_d3d_defaults, polygon_offset_level, polygon_offset_wgpu_defaults,
     size::{WEAP_ANIM_IDLE, WEAPON_ANIM_COUNT, weap_anim},
     snd_attenuate,
+};
+pub use asset_transport::{
+    RawFileEntry, RawFileExport, RawFileKind, ZoneRawFiles, export_t5_rawfiles, read_t5_rawfiles, string_table_csv,
 };
 pub use asset_world::{
     FilmVision, FilmVisionParseError, MaterialSortTrigger, SurfaceCastsSunShadow, WorldCapture,
@@ -244,7 +248,6 @@ pub use createfx::{
     CreateFxLoopSound, CreateFxOneshot, CreateFxOneshotEmitters, apply_createfx_effect_aliases,
     parse_createfx_effect_aliases, parse_createfx_loop_sounds, parse_createfx_oneshots,
 };
-pub use asset_transport::{RawFileExport, export_t5_rawfiles};
 pub use discover::{
     GamesRoot, ZoneFile, ensure_artifacts_dir, find_common_mp_for_envelope,
     find_common_mp_for_zone, find_localized_common_mp_for_zone, find_runtime_common_mp,

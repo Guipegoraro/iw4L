@@ -1,3 +1,4 @@
+pub mod actors;
 pub mod adopt;
 pub mod anim_script_gap;
 pub mod barrel_policy;
@@ -25,6 +26,7 @@ pub use killstreaks::{
 mod mantle_xanim;
 pub mod match_state;
 mod missile;
+pub mod mode_script;
 mod weapon_lock;
 pub use weapon_lock::WeaponLock;
 pub mod player_anim_script;
@@ -117,6 +119,7 @@ pub use identities::{
 };
 pub use input::{ActionRequestId, ClassId, ClientAction, SpawnPick, TickInput, action_request_id};
 pub use mantle_xanim::MantleXAnimBind;
+pub use mode_script::{ModeEngine, ModeScript, ScriptAmmo, ScriptPlayer};
 pub use movement_iw4::MoveMode;
 pub mod tuning;
 

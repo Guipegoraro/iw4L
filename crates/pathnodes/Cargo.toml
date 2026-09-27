@@ -1,0 +1,11 @@
+[package]
+name = "pathnodes"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "A map's path nodes and the search AI walks them with: nearest node, A* over the authored links."
+
+[dependencies]
+
+[lints]
+workspace = true

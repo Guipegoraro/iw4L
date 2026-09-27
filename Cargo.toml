@@ -36,6 +36,7 @@ members = [
     "crates/frame",
     "crates/fx",
     "crates/fx_iw4",
+    "crates/gsc_threads",
     "crates/gamemode_iw4",
     "crates/hud",
     "crates/hud_iw4",
@@ -49,6 +50,7 @@ members = [
     "crates/math_iw4",
     "crates/movement_iw4",
     "crates/net",
+    "crates/pathnodes",
     "crates/iw4l-master",
     "crates/perf",
     "crates/playerstate_iw4",
@@ -70,6 +72,7 @@ members = [
     "crates/updater",
     "crates/weapon_iw4",
     "crates/xmodel_runtime",
+    "crates/zombiemode_t5",
     "xtask",
 ]
 
@@ -139,6 +142,7 @@ frame = { path = "crates/frame" }
 fx = { path = "crates/fx" }
 fx_iw4 = { path = "crates/fx_iw4" }
 gamemode_iw4 = { path = "crates/gamemode_iw4" }
+gsc_threads = { path = "crates/gsc_threads" }
 hud = { path = "crates/hud" }
 hud_iw4 = { path = "crates/hud_iw4" }
 killcam_iw4 = { path = "crates/killcam_iw4" }
@@ -169,7 +173,9 @@ sim = { path = "crates/sim" }
 trace_iw4 = { path = "crates/trace_iw4" }
 ui = { path = "crates/ui" }
 weapon_iw4 = { path = "crates/weapon_iw4" }
+pathnodes = { path = "crates/pathnodes" }
 xmodel_runtime = { path = "crates/xmodel_runtime" }
+zombiemode_t5 = { path = "crates/zombiemode_t5" }
 glam = "0.32.1"
 # Bevy Remote Protocol server + extra methods (screenshot, input) for the
 # `bevy_brp_mcp` agent tools. Local dev only; see `bootstrap/brp`.

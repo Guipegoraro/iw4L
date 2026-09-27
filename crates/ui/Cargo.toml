@@ -10,6 +10,7 @@ diag.workspace = true
 bevy.workspace = true
 assets.workspace = true
 frame.workspace = true
+gamemode_iw4.workspace = true
 net = { path = "../net" }
 session.workspace = true
 sim.workspace = true

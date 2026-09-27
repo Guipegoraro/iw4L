@@ -40,6 +40,15 @@ struct KillstreakSceneModel {
 
 const KILLSTREAK_TARGETNAME: &str = "iw4l_killstreak";
 
+/// A mode script's actor (a zombie): a server mover whose animated DObj rides
+/// `meta.entity_dobjs`, drawn like a script model.
+#[derive(Component)]
+struct ActorSceneModel {
+    source: u32,
+}
+
+const ACTOR_TARGETNAME: &str = "iw4l_actor";
+
 #[derive(Clone, Copy, Debug)]
 struct ScriptMoverCentitySample {
     angles: [f32; 3],
@@ -242,6 +251,7 @@ pub fn register_script_model_systems(app: &mut App) {
             Update,
             (
                 sync_killstreak_scene_models,
+                sync_actor_scene_models,
                 apply_presented_script_model_dobjs,
                 apply_script_mover_centity_pose,
                 occupy_script_model_scene_ents,
@@ -424,6 +434,90 @@ fn sync_killstreak_scene_models(
                 },
             ));
         }
+    }
+}
+
+
+fn sync_actor_scene_models(
+    mut commands: Commands,
+    presented: Option<Res<net::PresentedSnapshot>>,
+    assets: Option<Res<assets::MapXModelSceneCatalog>>,
+    existing: Query<(Entity, &ActorSceneModel)>,
+) {
+    let Some(snapshot) = presented.as_ref().and_then(|p| p.snapshot()) else {
+        for (entity, _) in &existing {
+            commands.entity(entity).despawn();
+        }
+        return;
+    };
+    let Some(assets) = assets else {
+        return;
+    };
+    let mut desired = std::collections::HashMap::new();
+    for mover in &snapshot.meta.script_movers {
+        let source = mover.id.to_wire();
+        if sim::actors::actor_of_model_source(source).is_none() {
+            continue;
+        }
+        let owner = sim::AuthorityModelOwner::ScriptModel(mover.id);
+        let Some((_, state)) = snapshot
+            .meta
+            .entity_dobjs
+            .iter()
+            .find(|(have, _)| *have == owner)
+        else {
+            continue;
+        };
+        let Some(entnum) = u16::try_from(mover.state.number).ok() else {
+            continue;
+        };
+        desired.insert(source, (owner, state, entnum, mover.state.tr_base));
+    }
+    for (entity, marker) in &existing {
+        if desired.remove(&marker.source).is_none() {
+            commands.entity(entity).despawn();
+        }
+    }
+    // What is left in `desired` has no scene model yet.
+    for (source, (owner, state, entnum, origin)) in desired {
+        let Some(base) = state.composition.models.first() else {
+            continue;
+        };
+        let key = assets::MapXModelAssetKey(base.model.clone());
+        if !matches!(
+            assets.get(&key),
+            Some(
+                assets::MapXModelSceneAsset::Iw4(_)
+                    | assets::MapXModelSceneAsset::Iw5(_)
+                    | assets::MapXModelSceneAsset::T5(_)
+            )
+        ) {
+            diag::warn!(
+                World,
+                "actor {source:#x}: model {} is not in the scene catalog; not drawn",
+                base.model
+            );
+            continue;
+        }
+        let transform = Transform::from_translation(Vec3::from_array(origin));
+        commands.spawn((
+            ActorSceneModel { source },
+            transform,
+            Visibility::Inherited,
+            WorldScriptModelInstance {
+                id: assets::ScriptModelId::from_source_ordinal(source),
+                authority_owner: Some(owner),
+                current_model: key,
+                transform,
+                lighting_origin: origin,
+                dobj_state: state.clone(),
+                metadata: assets::ScriptModelMetadata {
+                    targetname: ACTOR_TARGETNAME.to_owned(),
+                    ..Default::default()
+                },
+                gentity_number: Some(entnum),
+            },
+        ));
     }
 }
 
@@ -784,9 +878,16 @@ fn pose_script_models(
                 continue;
             }
             live_ids.insert(id);
+            // A model's clips come from its own game: a Black Ops zombie
+            // plays Black Ops animations.
+            let namespace = match assets.get(&owner.current_model) {
+                Some(assets::MapXModelSceneAsset::T5(_)) => assets::AssetNamespace::T5,
+                Some(assets::MapXModelSceneAsset::Iw5(_)) => assets::AssetNamespace::Iw5,
+                _ => assets::AssetNamespace::Iw4,
+            };
             let request = owner
                 .dobj_state
-                .resolve_request(|name| xanims.as_ref()?.0.clip(assets::AssetNamespace::Iw4, name));
+                .resolve_request(|name| xanims.as_ref()?.0.clip(namespace, name));
             let index = if let Some(index) =
                 product.asset_index(&owner.current_model, &owner.dobj_state, &camera_lods)
             {

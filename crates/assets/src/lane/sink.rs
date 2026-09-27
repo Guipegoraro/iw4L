@@ -182,6 +182,8 @@ pub(crate) struct ZoneWalkSink {
 
     pub t5_teamset: Option<String>,
 
+    pub zombiemode: bool,
+
     pub exp_fog: Option<crate::ExpFog>,
 
     pub film_visions: BTreeMap<String, Result<crate::FilmVision, crate::FilmVisionParseError>>,
@@ -190,7 +192,7 @@ pub(crate) struct ZoneWalkSink {
 
     pub light_def_table: usize,
     pub light_def_bodies: usize,
-    strings_t5: fastfile_t5::ScriptStrings,
+    pub(crate) strings_t5: fastfile_t5::ScriptStrings,
     strings_iw5: fastfile_iw5::ScriptStrings,
 
     xmodel_names: HashMap<Ptr, Ptr>,
@@ -930,6 +932,12 @@ impl fastfile_t5::AssetLinkSink for ZoneWalkSink {
         }
         if let Some(teamset) = crate::t5_teamset_from_rawfile(name, data, zlib_compressed) {
             self.t5_teamset = Some(teamset);
+        }
+        if is_level_script(name)
+            && let Some(text) = asset_world::decode_rawfile_text(data, zlib_compressed)
+            && crate::t5_map_runs_zombiemode(&text)
+        {
+            self.zombiemode = true;
         }
         Ok(())
     }
@@ -1894,4 +1902,14 @@ fn t5_iw4_ptr(p: fastfile_t5::Ptr) -> Ptr {
         block: p.block,
         offset: p.offset,
     }
+}
+
+/// A level script (`maps/<map>.gsc`), not a shared `_` module or a map's
+/// `_fx`/`_amb`/`createfx` side scripts.
+fn is_level_script(name: &str) -> bool {
+    let name = name.replace('\\', "/");
+    let Some(file) = name.strip_prefix("maps/") else {
+        return false;
+    };
+    !file.contains('/') && !file.starts_with('_') && file.ends_with(".gsc")
 }

@@ -564,6 +564,10 @@ pub struct SimState {
     item_pickups: Vec<crate::ItemPickupRecord>,
 
     publish_snapshot: bool,
+
+    mode_script: crate::mode_script::ModeScriptSlot,
+
+    actor_models: crate::actors::ActorModels,
 }
 
 impl Default for SimState {
@@ -684,6 +688,8 @@ impl Default for SimState {
             use_objective_scaler: Vec::new(),
             item_pickups: Vec::new(),
             publish_snapshot: true,
+            mode_script: crate::mode_script::ModeScriptSlot::default(),
+            actor_models: crate::actors::ActorModels::default(),
         };
         world.recompute_content_digest();
         world
@@ -709,6 +715,37 @@ enum LagcompPlan {
 impl SimState {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Installs the match's mode script (`None` removes it). Call it after
+    /// [`SimState::bootstrap`]; the script runs from the next authoritative step.
+    pub fn install_mode_script(&mut self, script: Option<Box<dyn crate::ModeScript>>) {
+        self.mode_script.set(script);
+    }
+
+    pub fn has_mode_script(&self) -> bool {
+        self.mode_script.is_installed()
+    }
+
+    pub(crate) fn mode_script_mut(&mut self) -> &mut crate::mode_script::ModeScriptSlot {
+        &mut self.mode_script
+    }
+
+    /// The models mode-script actors may wear, from the map's zones.
+    pub fn install_actor_models(&mut self, models: crate::actors::ActorModels) {
+        self.actor_models = models;
+    }
+
+    pub fn actor_models(&self) -> &crate::actors::ActorModels {
+        &self.actor_models
+    }
+
+    /// Actors come and go at runtime, so the rows are a list, kept sorted by
+    /// owner like the installed ones.
+    pub(crate) fn entity_collision_capabilities_vec_mut(
+        &mut self,
+    ) -> &mut Vec<EntityCollisionCapabilities> {
+        &mut self.entity_collision_capabilities
     }
 
     pub fn bootstrap(&mut self, bootstrap: MatchBootstrap) -> Result<(), &'static str> {

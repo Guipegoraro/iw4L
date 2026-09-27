@@ -205,6 +205,50 @@ impl ZoneLane for T5Lane {
         let exp_fog = sink.exp_fog;
         let createart_name = sink.createart_name.clone();
         let t5_teamset = sink.t5_teamset.clone();
+        let zombiemode = sink.zombiemode;
+        let path_graph = std::sync::Arc::new(t5_path_graph(&stream, &sink.strings_t5, &mut report));
+        let map_entities: std::sync::Arc<str> = if zombiemode {
+            asset_world::map_entity_text_t5(&stream)
+                .unwrap_or_default()
+                .into()
+        } else {
+            std::sync::Arc::from("")
+        };
+        let mut map_xanims = std::mem::take(&mut sink.xanims);
+        let mut anim_trees = std::collections::BTreeMap::new();
+        let string_tables = if zombiemode {
+            let companions = zombie_companions(path, &mut report);
+            // The map's own animations win over the companions'.
+            let mut xanims = companions.xanims;
+            xanims.absorb_local(map_xanims);
+            map_xanims = xanims;
+            anim_trees = companions.anim_trees;
+            companions.string_tables
+        } else {
+            std::collections::BTreeMap::new()
+        };
+        report.push(format!(
+            "t5 xanims for the match: {} ({} capture gaps)",
+            map_xanims.len(),
+            map_xanims.capture_gaps
+        ));
+        if zombiemode {
+            let walk = map_xanims
+                .decode(crate::AssetNamespace::T5, "ai_zombie_walk_v1")
+                .filter(|clip| clip.has_delta());
+            report.push(match walk {
+                Some(clip) => {
+                    let end = clip.abs_delta_trans(1.0);
+                    let dist = (end[0] * end[0] + end[1] * end[1]).sqrt();
+                    format!(
+                        "root motion: ai_zombie_walk_v1 moves {dist:.1} units in {:.2} s ({:.1} u/s)",
+                        clip.duration(),
+                        dist / clip.duration().max(0.001)
+                    )
+                }
+                None => "root motion: ai_zombie_walk_v1 has no delta translation".into(),
+            });
+        }
         let script_sound = std::mem::take(&mut sink.script_sound).finish();
         match (&createart_name, exp_fog) {
             (Some(name), Some(fog)) => report.push(format!(
@@ -283,8 +327,14 @@ impl ZoneLane for T5Lane {
                 spawns: dm_spawns,
                 bodies,
                 fpv_meshes,
+                xanims: map_xanims,
                 facts: crate::MapFacts {
                     t5_teamset: t5_teamset.clone(),
+                    zombiemode,
+                    string_tables: string_tables.clone(),
+                    anim_trees: anim_trees.clone(),
+                    path_graph: path_graph.clone(),
+                    map_entities: map_entities.clone(),
                     script_sound: script_sound.clone(),
                     ..Default::default()
                 },
@@ -598,11 +648,17 @@ impl ZoneLane for T5Lane {
                     spawns: dm_spawns,
                     bodies,
                     fpv_meshes,
+                    xanims: map_xanims,
                     facts: crate::MapFacts {
                         minimap_corners,
                         north_yaw,
                         compass,
                         t5_teamset: t5_teamset.clone(),
+                        zombiemode,
+                        string_tables: string_tables.clone(),
+                        anim_trees: anim_trees.clone(),
+                        path_graph: path_graph.clone(),
+                    map_entities: map_entities.clone(),
                         script_sound: script_sound.clone(),
                         ..Default::default()
                     },
@@ -625,8 +681,14 @@ impl ZoneLane for T5Lane {
                     spawns: dm_spawns,
                     bodies,
                     fpv_meshes,
+                    xanims: map_xanims,
                     facts: crate::MapFacts {
                         t5_teamset: t5_teamset.clone(),
+                        zombiemode,
+                        string_tables: string_tables.clone(),
+                        anim_trees: anim_trees.clone(),
+                        path_graph: path_graph.clone(),
+                    map_entities: map_entities.clone(),
                         script_sound: script_sound.clone(),
                         ..Default::default()
                     },
@@ -862,4 +924,208 @@ impl ZoneLane for T5Lane {
             cac_tables: sink.stats_tables.into_values().collect(),
         }
     }
+}
+
+/// What a zombies map takes from its companion zones.
+#[derive(Default)]
+struct ZombieCompanions {
+    string_tables: std::collections::BTreeMap<String, String>,
+    anim_trees: std::collections::BTreeMap<String, String>,
+    xanims: crate::XAnimBuild,
+}
+
+/// Collects a companion zone's string tables and animations in one walk.
+struct CompanionSink {
+    strings: fastfile_t5::ScriptStrings,
+    tables: Vec<(String, String)>,
+    anim_trees: Vec<(String, String)>,
+    xanims: crate::XAnimBuild,
+}
+
+impl fastfile_t5::AssetSink for CompanionSink {
+    fn set_script_strings(&mut self, strings: fastfile_t5::ScriptStrings) {
+        self.strings = strings;
+    }
+
+    fn load_asset(
+        &mut self,
+        s: &mut fastfile_t5::ZoneStream<'_>,
+        _index: usize,
+        ty: fastfile_t5::AssetType,
+        slot: fastfile_t5::Ptr,
+    ) -> fastfile_t5::Result<()> {
+        fastfile_t5::load_asset_at_observed(s, ty, slot, self).map(|_| ())
+    }
+}
+
+impl fastfile_t5::AssetLinkSink for CompanionSink {
+    fn loaded(
+        &mut self,
+        _s: &fastfile_t5::ZoneStream<'_>,
+        _ty: fastfile_t5::AssetType,
+        _slot: fastfile_t5::Ptr,
+        _insert_slot: Option<fastfile_t5::Ptr>,
+    ) -> fastfile_t5::Result<()> {
+        Ok(())
+    }
+
+    fn alias(
+        &mut self,
+        _ty: fastfile_t5::AssetType,
+        _slot: fastfile_t5::Ptr,
+        _target: fastfile_t5::Ptr,
+    ) -> fastfile_t5::Result<()> {
+        Ok(())
+    }
+
+    fn capture_string_table(
+        &mut self,
+        s: &fastfile_t5::ZoneStream<'_>,
+        header: fastfile_t5::Ptr,
+    ) -> fastfile_t5::Result<()> {
+        self.tables.extend(crate::string_table_csv(s, header));
+        Ok(())
+    }
+
+    fn capture_xanim(
+        &mut self,
+        s: &fastfile_t5::ZoneStream<'_>,
+        geometry: fastfile_t5::XAnimPartsGeometry,
+    ) -> fastfile_t5::Result<()> {
+        self.xanims.capture_xanim_t5(s, &self.strings, geometry);
+        Ok(())
+    }
+
+    /// Animtrees (`animtrees/generic_human.atr`): the AI's tree, as source.
+    fn capture_raw_file(
+        &mut self,
+        name: &str,
+        data: &[u8],
+        zlib_compressed: bool,
+    ) -> fastfile_t5::Result<()> {
+        if name.ends_with(".atr")
+            && let Some(text) = asset_world::decode_rawfile_text(data, zlib_compressed)
+        {
+            self.anim_trees.push((name.to_owned(), text));
+        }
+        Ok(())
+    }
+}
+
+fn walk_companion(path: &Path, sink: &mut CompanionSink) -> Result<usize, String> {
+    let image = crate::open_zone(path).map_err(|e| format!("{e:?}"))?;
+    let header = image.t5_header().map_err(|e| format!("{e:?}"))?;
+    let mut memory = T5ZoneMemory::for_header(&header);
+    let mut stream = memory.stream(&image.bytes).map_err(|e| format!("{e:?}"))?;
+    fastfile_t5::load_zone(&mut stream, sink).map_err(|e| format!("walk stopped: {e:?}"))?;
+    Ok(sink.xanims.len())
+}
+
+/// The zombies companion zones, in load order: `common_zombie`, its patch,
+/// then the map's own patch; a later zone's table or animation replaces an
+/// earlier one of the same name.
+fn zombie_companions(map: &Path, report: &mut Vec<String>) -> ZombieCompanions {
+    let mut out = ZombieCompanions::default();
+    let (Some(dir), Some(stem)) = (map.parent(), map.file_stem().and_then(|s| s.to_str())) else {
+        return out;
+    };
+    for zone in [
+        "common_zombie".to_owned(),
+        "common_zombie_patch".to_owned(),
+        format!("{stem}_patch"),
+    ] {
+        let zone_path = dir.join(format!("{zone}.ff"));
+        if !zone_path.is_file() {
+            report.push(format!("zombies companion zone {zone}: not found"));
+            continue;
+        }
+        let mut sink = CompanionSink {
+            strings: fastfile_t5::ScriptStrings::default(),
+            tables: Vec::new(),
+            anim_trees: Vec::new(),
+            xanims: crate::XAnimBuild::default(),
+        };
+        sink.xanims
+            .set_capture_zone(crate::ZoneOwner::from_zone_path(&zone_path));
+        sink.xanims.set_capture_ns(crate::AssetNamespace::T5);
+        match walk_companion(&zone_path, &mut sink) {
+            Ok(xanims) => {
+                report.push(format!(
+                    "zombies companion zone {zone}: {} string tables, {xanims} xanims ({} gaps)",
+                    sink.tables.len(),
+                    sink.xanims.capture_gaps
+                ));
+                out.string_tables.extend(sink.tables);
+                out.anim_trees.extend(sink.anim_trees);
+                out.xanims.absorb_local(sink.xanims);
+            }
+            Err(error) => report.push(format!("zombies companion zone {zone}: {error}")),
+        }
+    }
+    out
+}
+
+/// The zone's `PathData` as a [`pathnodes::PathGraph`], checked against the
+/// `node_*` entities the map's entity string places.
+fn t5_path_graph(
+    stream: &fastfile_t5::ZoneStream<'_>,
+    strings: &fastfile_t5::ScriptStrings,
+    report: &mut Vec<String>,
+) -> pathnodes::PathGraph {
+    let records = asset_world::path_nodes_t5::read_path_nodes(stream, strings);
+    if records.is_empty() {
+        return pathnodes::PathGraph::default();
+    }
+    let graph = pathnodes::PathGraph {
+        nodes: records
+            .into_iter()
+            .map(|node| pathnodes::PathNode {
+                origin: node.origin,
+                node_type: node.node_type,
+                targetname: node.targetname,
+                target: node.target,
+                script_noteworthy: node.script_noteworthy,
+                animscript: node.animscript,
+                links: node
+                    .links
+                    .iter()
+                    .map(|link| pathnodes::PathLink {
+                        to: u32::from(link.node),
+                        dist: link.dist,
+                        negotiation: link.negotiation,
+                        disconnected: link.disconnect_count > 0,
+                    })
+                    .collect(),
+            })
+            .collect(),
+    };
+    let entities = asset_world::node_entities_t5(stream);
+    let matched = entities
+        .iter()
+        .filter(|(_, origin)| {
+            graph
+                .nodes
+                .iter()
+                .any(|node| (0..3).all(|axis| (node.origin[axis] - origin[axis]).abs() < 1.0))
+        })
+        .count();
+    let negotiation = graph
+        .nodes
+        .iter()
+        .flat_map(|node| &node.links)
+        .filter(|link| link.negotiation)
+        .count();
+    let traversal_scripts = graph
+        .nodes
+        .iter()
+        .filter(|node| !node.animscript.is_empty())
+        .count();
+    report.push(format!(
+        "path nodes: {} nodes, {} links ({negotiation} traversal), {traversal_scripts} with an animscript; {matched}/{} node entities at a node origin; {} islands",
+        graph.len(),
+        graph.link_count(),
+        entities.len(),
+        graph.component_count()
+    ));
+    graph
 }

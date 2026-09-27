@@ -22,7 +22,9 @@ pub use iwd::{
     inflate_zlib, iwd_entry_reads, iwd_read_cost, read_iwd_named, read_text,
 };
 pub use load_jobs::{CacheResult, Job, JobKind};
-pub use rawfiles::{RawFileExport, export_t5_rawfiles};
+pub use rawfiles::{
+    RawFileEntry, RawFileExport, RawFileKind, ZoneRawFiles, export_t5_rawfiles, read_t5_rawfiles, string_table_csv,
+};
 pub use namespace_trees::{NamespaceSoundIwd, NamespaceTree, NamespaceTrees};
 pub use progress::{
     LoadLaneTiming, LoadProgress, LoadSnapshot, StageEnd, StageHandle, StageId, StageKey,

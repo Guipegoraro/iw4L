@@ -683,6 +683,20 @@ pub fn apply_prepared_match(
             &map_use_triggers,
             &flag_descriptors,
         )?;
+        sim.install_mode_script((kind == gamemode_iw4::GameModeKind::Zombies).then(|| {
+            let tables = zombiemode_t5::StringTables::from_csv(
+                facts
+                    .string_tables
+                    .iter()
+                    .map(|(name, csv)| (name.as_str(), csv.as_str())),
+            );
+            Box::new(zombiemode_t5::ZombiesMode::new(
+                &prepared_map.zone,
+                tables,
+                facts.path_graph.clone(),
+                &facts.map_entities,
+            )) as Box<dyn sim::ModeScript>
+        }));
         sim.objectives.flag_models = objective_flags;
         sim.objectives.attackers = objective_attackers;
         let defenders = sim.objectives.defenders();
@@ -1010,7 +1024,7 @@ fn preflight_match_install(
         );
     }
     let strings = std::mem::take(&mut prepared.strings);
-    let kind = match match_kind(mode_selection) {
+    let kind = match match_kind(mode_selection, &prepared_map.facts) {
         Ok(kind) => kind,
         Err(gap) => {
             diag::info!(Sim, "match install refused: {gap}");
@@ -1256,7 +1270,13 @@ fn collect_animated_prop_anims(
 
 fn match_kind(
     selection: Option<&sim::HostGameModeSelection>,
+    facts: &assets::MapFacts,
 ) -> Result<gamemode_iw4::GameModeKind, &'static str> {
+    // The map decides, as in Black Ops: a zombies level plays zombies whatever
+    // mode the host had picked.
+    if facts.zombiemode {
+        return Ok(gamemode_iw4::GameModeKind::Zombies);
+    }
     if let Some(selection) = selection {
         return Ok(selection.kind());
     }
@@ -1490,6 +1510,9 @@ struct AuthorityEntityModelInstall {
     installed_owners: Vec<(assets::ScriptModelId, sim::AuthorityModelOwner)>,
     ambiguous_brush_links: usize,
     standalone_brush_links: usize,
+    /// The models zombies actors wear, with the ones the map zone lacks.
+    actor_models: sim::actors::ActorModels,
+    missing_actor_models: Vec<&'static str>,
 }
 
 fn apply_toy_spawn_models(world: &mut assets::PreparedWorld) {
@@ -1697,7 +1720,27 @@ fn authority_entity_model_install(world: &assets::PreparedWorld) -> AuthorityEnt
         }
         standalone_brush_links += 1;
     }
+    let mut actor_models = Vec::new();
+    let mut missing_actor_models = Vec::new();
+    for name in zombiemode_t5::actor_models() {
+        let key = assets::MapXModelAssetKey(name.to_owned());
+        match world.map_xmodel_scene_assets.get(&key) {
+            Some(
+                assets::MapXModelSceneAsset::Iw4(model)
+                | assets::MapXModelSceneAsset::Iw5(model)
+                | assets::MapXModelSceneAsset::T5(model),
+            ) => actor_models.push((
+                name.to_owned(),
+                model.retained_capability().map(std::sync::Arc::new),
+            )),
+            Some(assets::MapXModelSceneAsset::Unavailable { .. }) | None => {
+                missing_actor_models.push(name);
+            }
+        }
+    }
     AuthorityEntityModelInstall {
+        actor_models: sim::actors::ActorModels::new(actor_models),
+        missing_actor_models,
         capabilities,
         vehicles,
         toys,
@@ -1819,6 +1862,15 @@ fn install_clip_and_player(
         .iter()
         .map(|capabilities| capabilities.linked_brushes.len())
         .sum::<usize>();
+    if kind == gamemode_iw4::GameModeKind::Zombies {
+        diag::info!(
+            Sim,
+            "zombies: {} actor models ready, missing {:?}",
+            authority_models.actor_models.len(),
+            authority_models.missing_actor_models
+        );
+        sim.install_actor_models(authority_models.actor_models);
+    }
     sim.install_entity_collision_capabilities(authority_models.capabilities);
     sim::phase_materialize_entity_dobjs(sim);
     let collision_bones = sim
@@ -1860,7 +1912,11 @@ fn install_clip_and_player(
             script_destructable_area: p.script_destructable_area.clone(),
         })
         .collect();
-    let rows = bootstrap_class_rows(host_classes);
+    let rows = if kind == gamemode_iw4::GameModeKind::Zombies {
+        vec![zombies_start_row(weapons)]
+    } else {
+        bootstrap_class_rows(host_classes)
+    };
     let projected: Vec<AuthoritativeClassProjection> = rows
         .iter()
         .enumerate()
@@ -1907,7 +1963,7 @@ fn install_clip_and_player(
             .and_then(|s| s.parse().ok())
             .unwrap_or(match kind {
                 gamemode_iw4::GameModeKind::Domination => gamemode_iw4::dom::SCORE_LIMIT,
-                gamemode_iw4::GameModeKind::Demolition => 0,
+                gamemode_iw4::GameModeKind::Demolition | gamemode_iw4::GameModeKind::Zombies => 0,
                 _ => sim::FFA.score_limit,
             }),
         // Minutes; 0 plays with no time limit.
@@ -1918,6 +1974,7 @@ fn install_clip_and_player(
             .unwrap_or(match kind {
                 gamemode_iw4::GameModeKind::Domination => gamemode_iw4::dom::TIME_LIMIT_MS,
                 gamemode_iw4::GameModeKind::Demolition => gamemode_iw4::dd::TIME_LIMIT_MS,
+                gamemode_iw4::GameModeKind::Zombies => 0,
                 _ => sim::FFA.time_limit_ms,
             }),
         allow_debug_actions: true,
@@ -1972,6 +2029,39 @@ fn install_clip_and_player(
         "player awaits SelectClass; Equip ack enables sim camera (no authored intermission)"
     };
     Ok((gap, lock_reasons, bot_class_ids))
+}
+
+/// The zombies start loadout (`zombiemode_t5::start_loadout`), each slot the
+/// first of its names the weapon registry knows.
+fn zombies_start_row(weapons: &WeaponRegistry) -> ClassRow {
+    let pick = |names: &[&str]| {
+        names
+            .iter()
+            .find(|name| matches!(weapons.resolve_index(name), Ok(Some(_))))
+            .map_or_else(
+                || {
+                    diag::info!(Sim, "zombies start loadout: none of {names:?} is loaded");
+                    String::new()
+                },
+                |name| (*name).to_owned(),
+            )
+    };
+    let start = zombiemode_t5::start_loadout();
+    ClassRow {
+        weapons: [
+            pick(start.primary),
+            String::new(),
+            pick(start.lethal),
+            String::new(),
+        ],
+        attachments: [Vec::new(), Vec::new()],
+        perks: [
+            "specialty_null".to_owned(),
+            "specialty_null".to_owned(),
+            "specialty_null".to_owned(),
+        ],
+        deathstreak: String::new(),
+    }
 }
 
 pub(crate) fn bootstrap_class_rows(host: Option<&HostClassLoadouts>) -> Vec<ClassRow> {

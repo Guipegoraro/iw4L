@@ -240,6 +240,17 @@ impl FrameWorld<'_> {
         true
     }
 
+    /// Moves a mover and turns it in one go, without a trajectory: the
+    /// snapshot carries the new base and clients interpolate between them.
+    pub fn set_script_mover_pose(&mut self, number: i32, origin: [f32; 3], angles: [f32; 3]) -> bool {
+        let Some(mover) = self.script_mover_mut_by_number(number) else {
+            return false;
+        };
+        mover.state.tr_base = origin;
+        mover.state.apos_tr_base = angles;
+        true
+    }
+
     pub(crate) fn dropped_item_count(&self) -> usize {
         dropped_item_row_count(self.ecs)
     }

@@ -464,7 +464,7 @@ impl XAnimBuild {
                     names,
                     notifies,
                     indices,
-                    delta_trans: None,
+                    delta_trans: copy_delta_trans_t5(s, geometry.delta_trans),
                 }),
             },
         );
@@ -706,6 +706,59 @@ fn copy_u32_iw5(
         .chunks_exact(4)
         .map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]))
         .collect()
+}
+
+fn copy_f32_3_t5(
+    s: &fastfile_t5::ZoneStream<'_>,
+    ptr: fastfile_t5::Ptr,
+    off: usize,
+) -> Option<[f32; 3]> {
+    let bytes = s.slice_at(ptr, off, 12).ok()?;
+    Some([
+        f32::from_le_bytes(bytes[0..4].try_into().ok()?),
+        f32::from_le_bytes(bytes[4..8].try_into().ok()?),
+        f32::from_le_bytes(bytes[8..12].try_into().ok()?),
+    ])
+}
+
+/// The T5 delta part's translation, in the same packed form as IW4's.
+fn copy_delta_trans_t5(
+    s: &fastfile_t5::ZoneStream<'_>,
+    geo: fastfile_t5::XAnimDeltaTransGeometry,
+) -> Option<RawDeltaTrans> {
+    if let Some(constant) = geo.constant {
+        let mins = copy_f32_3_t5(s, constant, 0)?;
+        return Some(RawDeltaTrans {
+            size: 0,
+            small: geo.small != 0,
+            mins,
+            step: [0.0; 3],
+            indices: Vec::new(),
+            packed: Vec::new(),
+        });
+    }
+    let mins_step = geo.mins_step?;
+    let mins = copy_f32_3_t5(s, mins_step, 0)?;
+    let step = copy_f32_3_t5(s, mins_step, 12)?;
+    let n = geo.size as usize + 1;
+    let indices = if geo.indices_are_bytes {
+        copy_u8_t5(s, geo.indices, n)
+            .into_iter()
+            .map(u16::from)
+            .collect()
+    } else {
+        copy_u16_t5(s, geo.indices, n)
+    };
+    let packed_n = if geo.small != 0 { 3 * n } else { 6 * n };
+    let packed = copy_u8_t5(s, geo.frames, packed_n);
+    Some(RawDeltaTrans {
+        size: geo.size,
+        small: geo.small != 0,
+        mins,
+        step,
+        indices,
+        packed,
+    })
 }
 
 fn copy_u8_t5(
