@@ -93,6 +93,8 @@ use render_material::{
 
 pub const CODE_TEXTURE_FLOATZ: u32 = 0x0f;
 
+pub const CODE_TEXTURE_BLACK: u32 = 0x00;
+
 pub const CODE_TEXTURE_RESOLVED_POST_SUN: u32 = 9;
 
 pub const CODE_TEXTURE_SHADOWMAP_SUN: u32 = 6;
@@ -6850,6 +6852,7 @@ pub(super) fn register(app: &mut App) {
         .init_resource::<PublishedRenderFrame>()
         .init_resource::<ExactColourGeometry>()
         .init_resource::<super::resolved_scene::ResolvedScene>()
+        .init_resource::<super::resolved_scene::CodeBlackImage>()
         .init_resource::<SmodelCacheGpu>()
         .init_resource::<ExactColourPipeline>()
         .init_resource::<ExactColourBindingCache>()

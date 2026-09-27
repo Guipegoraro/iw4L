@@ -478,6 +478,19 @@ const T5_CONST_ALIASES: &[(&str, &str)] = &[
     ("PARTICLE_CLOUD_MATRIX", "PARTICLE_CLOUD_MATRIX0"),
 ];
 
+/// T5 code textures with no IW4 counterpart that stand in for one.
+///
+/// IW4L has no terrain scorch system. The scorch weight a `_sco` world
+/// technique blends by arrives on vertex stream 2, which the engine fills at
+/// run time and IW4L never supplies, so the shader reads the D3D9 default of
+/// zero and the scorch texture never shows: black is "nothing burnt".
+const T5_TEXTURE_ALIASES: &[(&str, &str)] = &[
+    ("TERRAIN_SCORCH_TEXTURE_0", "BLACK"),
+    ("TERRAIN_SCORCH_TEXTURE_1", "BLACK"),
+    ("TERRAIN_SCORCH_TEXTURE_2", "BLACK"),
+    ("TERRAIN_SCORCH_TEXTURE_3", "BLACK"),
+];
+
 pub const T5_CODE_CONST_LIMIT: usize = 0xe5;
 pub const T5_CODE_TEXTURE_LIMIT: usize = 0x2b;
 
@@ -498,11 +511,11 @@ const fn name_eq(a: &str, b: &str) -> bool {
     bytes_eq(a.as_bytes(), b.as_bytes())
 }
 
-const fn alias_of(name: &str) -> &str {
+const fn alias_of<'a>(aliases: &[(&str, &'a str)], name: &'a str) -> &'a str {
     let mut i = 0;
-    while i < T5_CONST_ALIASES.len() {
-        if name_eq(name, T5_CONST_ALIASES[i].0) {
-            return T5_CONST_ALIASES[i].1;
+    while i < aliases.len() {
+        if name_eq(name, aliases[i].0) {
+            return aliases[i].1;
         }
         i += 1;
     }
@@ -514,7 +527,7 @@ const fn build_const_remap() -> [Option<u16>; T5_CODE_CONST_LIMIT] {
     let mut i = 0;
     while i < T5_CODE_CONST.len() {
         let (name, t5) = T5_CODE_CONST[i];
-        let want = alias_of(name);
+        let want = alias_of(T5_CONST_ALIASES, name);
         let slot = t5 as usize;
         let mut j = 0;
         while j < IW4_CODE_CONST.len() {
@@ -534,10 +547,11 @@ const fn build_texture_remap() -> [Option<u16>; T5_CODE_TEXTURE_LIMIT] {
     let mut i = 0;
     while i < T5_CODE_TEXTURE.len() {
         let (name, t5) = T5_CODE_TEXTURE[i];
+        let want = alias_of(T5_TEXTURE_ALIASES, name);
         let slot = t5 as usize;
         let mut j = 0;
         while j < IW4_CODE_TEXTURE.len() {
-            if name_eq(name, IW4_CODE_TEXTURE[j].0) {
+            if name_eq(want, IW4_CODE_TEXTURE[j].0) {
                 out[slot] = Some(IW4_CODE_TEXTURE[j].1);
                 break;
             }

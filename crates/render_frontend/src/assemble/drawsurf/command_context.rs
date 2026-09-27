@@ -246,6 +246,13 @@ pub const CODE_TEXTURE_RESOLVED_POST_SUN: u32 = 9;
 
 pub const CODE_TEXTURE_FLOATZ_SAMPLER: u8 = 0x61;
 
+/// The engine's constant black image. IW4 techniques rarely read it; T5 ones
+/// reach it through code textures IW4L stands in for with black (see
+/// `asset_material::t5_code_remap`).
+pub const CODE_TEXTURE_BLACK: u32 = 0x00;
+
+pub const CODE_TEXTURE_BLACK_SAMPLER: u8 = 0x62;
+
 pub use super::fog::MapFrameFog;
 
 pub use crate::prepare::scene::world::{
@@ -441,6 +448,12 @@ pub fn produce_model_lighting_code_texture(
         CODE_TEXTURE_MODEL_LIGHTING,
         CODE_TEXTURE_MODEL_LIGHTING_SAMPLER,
     )
+}
+
+pub fn produce_black_code_texture(
+    sources: &mut RuntimeCodeSources,
+) -> Result<(), super::material_runtime::CodeSourceError> {
+    sources.set_texture(CODE_TEXTURE_BLACK, CODE_TEXTURE_BLACK_SAMPLER)
 }
 
 pub fn produce_floatz_code_texture(
@@ -1001,6 +1014,7 @@ pub(crate) fn update_command_context_code_sources(
         let _ = produce_model_lighting_code_texture(&mut mat_frame.code_sources);
     }
     let _ = produce_floatz_code_texture(&mut mat_frame.code_sources);
+    let _ = produce_black_code_texture(&mut mat_frame.code_sources);
     let _ = produce_spot_shadow_code_texture(&mut mat_frame.code_sources);
     let _ = mat_frame
         .code_sources

@@ -286,6 +286,9 @@ fn routed_attributes(
                 source,
             },
         )?;
+        if !decl.family.host_supplies_stream(layout.stream) {
+            continue;
+        }
         if let vd::D3dDeclType::Unknown(raw) = layout.decl_type {
             return Err(PassAbiRefusal::UnknownDeclType { source, raw });
         }

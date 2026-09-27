@@ -148,6 +148,8 @@ pub struct RuntimeUploadedImageRegistry {
     pub resolved_post_sun: Option<Result<TextureView, UploadedViewRefusal>>,
     pub float_z: Option<Result<TextureView, UploadedViewRefusal>>,
 
+    pub black: Option<Result<TextureView, UploadedViewRefusal>>,
+
     pub sun_shadow: Option<Result<TextureView, UploadedViewRefusal>>,
 
     pub spot_shadow_rt10: Option<Result<TextureView, UploadedViewRefusal>>,
@@ -1334,6 +1336,7 @@ fn take_uploaded_material(
 fn is_runtime_render_target_code_image(index: u32) -> bool {
     index == crate::drawsurf::CODE_TEXTURE_RESOLVED_POST_SUN
         || index == crate::drawsurf::CODE_TEXTURE_FLOATZ
+        || index == crate::drawsurf::CODE_TEXTURE_BLACK
         || index == crate::drawsurf::CODE_TEXTURE_SHADOWMAP_SUN
         || index == crate::drawsurf::CODE_TEXTURE_SHADOWMAP_SPOT
 }
@@ -1358,6 +1361,14 @@ fn take_uploaded_code_image(
             .float_z
             .clone()
             .ok_or(TextureBindRefusal::FloatZUnresolved { register })?
+            .map_err(|cause| TextureBindRefusal::UploadedView { register, cause })?;
+        return Ok((view, UploadedTextureIdentity::Code(index)));
+    }
+    if index == crate::drawsurf::CODE_TEXTURE_BLACK {
+        let view = uploaded
+            .black
+            .clone()
+            .ok_or(TextureBindRefusal::CodeImageUnproduced { register, index })?
             .map_err(|cause| TextureBindRefusal::UploadedView { register, cause })?;
         return Ok((view, UploadedTextureIdentity::Code(index)));
     }

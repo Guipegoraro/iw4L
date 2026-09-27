@@ -5,6 +5,38 @@ use bevy::render::render_resource::{
 };
 use bevy::render::renderer::RenderDevice;
 
+/// The code texture `BLACK`: one texel, never written, so it reads as the
+/// zero-initialised `(0, 0, 0, 1)` of an R8 image.
+#[derive(Resource, Default)]
+pub(super) struct CodeBlackImage {
+    view: Option<TextureView>,
+}
+
+impl CodeBlackImage {
+    pub fn ensure(&mut self, device: &RenderDevice) -> TextureView {
+        self.view
+            .get_or_insert_with(|| {
+                device
+                    .create_texture(&TextureDescriptor {
+                        label: Some("exact_code_black"),
+                        size: bevy::render::render_resource::Extent3d {
+                            width: 1,
+                            height: 1,
+                            depth_or_array_layers: 1,
+                        },
+                        mip_level_count: 1,
+                        sample_count: 1,
+                        dimension: TextureDimension::D2,
+                        format: bevy::render::render_resource::TextureFormat::R8Unorm,
+                        usage: TextureUsages::TEXTURE_BINDING,
+                        view_formats: &[],
+                    })
+                    .create_view(&TextureViewDescriptor::default())
+            })
+            .clone()
+    }
+}
+
 #[derive(Resource, Default)]
 pub(super) struct ResolvedScene {
     target: Option<Texture>,

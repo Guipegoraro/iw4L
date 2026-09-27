@@ -940,6 +940,7 @@ pub(super) fn install_shared_colour_pass(
         mut floatz,
         mut floatz_pipelines,
         mut resolved_scene,
+        mut code_black,
         mut installed,
     ): (
         ResMut<ShadowmapSunArena>,
@@ -949,6 +950,7 @@ pub(super) fn install_shared_colour_pass(
         ResMut<ExactFloatZResolve>,
         ResMut<SpecializedRenderPipelines<ExactFloatZResolve>>,
         ResMut<super::super::resolved_scene::ResolvedScene>,
+        ResMut<super::super::resolved_scene::CodeBlackImage>,
         ResMut<InstalledColourPass>,
     ),
 ) {
@@ -985,6 +987,7 @@ pub(super) fn install_shared_colour_pass(
         floatz: &mut floatz,
         floatz_pipelines: &mut floatz_pipelines,
         resolved_scene: &mut resolved_scene,
+        code_black: &mut code_black,
     });
     let generation = extracted.world.generation;
     open_scene_table_epoch(
@@ -1026,6 +1029,7 @@ struct CameraTargetInstall<'a, 'r> {
     floatz: &'a mut ExactFloatZResolve,
     floatz_pipelines: &'a mut SpecializedRenderPipelines<ExactFloatZResolve>,
     resolved_scene: &'a mut super::super::resolved_scene::ResolvedScene,
+    code_black: &'a mut super::super::resolved_scene::CodeBlackImage,
 }
 
 fn install_camera_frame_targets(install: CameraTargetInstall<'_, '_>) -> CameraFrameTargets {
@@ -1067,6 +1071,15 @@ fn install_camera_frame_targets(install: CameraTargetInstall<'_, '_>) -> CameraF
         install
             .uploaded
             .publish_frame_target(|registry| &mut registry.resolved_post_sun, Some(view));
+    }
+    if colour.binds_code_texture(super::CODE_TEXTURE_BLACK)
+        || light.binds_code_texture(super::CODE_TEXTURE_BLACK)
+        || emissive.binds_code_texture(super::CODE_TEXTURE_BLACK)
+    {
+        let view = install.code_black.ensure(install.device);
+        install
+            .uploaded
+            .publish_frame_target(|registry| &mut registry.black, Some(view));
     }
     if needs_floatz {
         let size = depth.texture.size();

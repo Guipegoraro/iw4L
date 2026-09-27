@@ -10,6 +10,8 @@ pub enum VertexLayoutFamily {
 
 pub const T5_WORLD_LAYER_HOST_STRIDE: usize = 40;
 
+const T5_WORLD_SCORCH_STREAM: u8 = 2;
+
 impl VertexLayoutFamily {
     pub fn source_count(self) -> usize {
         match self {
@@ -39,6 +41,13 @@ impl VertexLayoutFamily {
                 })
             }
         }
+    }
+    /// Whether the host uploads this stream at all. T5 world vertex types
+    /// declare a stream 2 the engine fills at run time for terrain scorch
+    /// marks; IW4L has no scorch system and never supplies it, so a source on
+    /// it stays unrouted and the shader reads the D3D9 default (zero weight).
+    pub fn host_supplies_stream(self, stream: u8) -> bool {
+        !(self == Self::T5 && stream == T5_WORLD_SCORCH_STREAM)
     }
     pub fn host_stream_stride(self, vertex_type: u8, stream: u8) -> Option<u16> {
         match self {
