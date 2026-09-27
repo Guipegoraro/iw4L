@@ -24,6 +24,10 @@ pub const DEATH: &str = "death";
 /// Not measured against retail yet (ZMB-029).
 pub const ACTOR_TURN_RATE: f32 = 360.0;
 
+/// The playback rate every actor clip runs at: `SetAnimKnob…( clip, 1, 0.2,
+/// 1 )`, the last argument, in every zombie script that starts one.
+pub const ANIM_RATE: f32 = 1.0;
+
 /// A zombie actor's script owner: actors sit above every entity number.
 pub fn actor_owner(actor: u32) -> Owner {
     Owner(ACTOR_OWNER_BASE + u64::from(actor))
@@ -272,8 +276,9 @@ impl Motor {
 /// `old` over `advance` of the clip: a loop wraps through its end (whole
 /// cycles included), a clip that does not loop stops at its end.
 pub fn root_motion_distance(clip: &AnimClip, old: f32, advance: f32, looping: bool) -> f32 {
-    let flat = |a: [f32; 3], b: [f32; 3]| ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2)).sqrt();
-    let span = |from: f32, to: f32| flat(clip.abs_delta_trans(from), clip.abs_delta_trans(to));
+    let span = |from: f32, to: f32| {
+        math_iw4::vec3_distance_2d(clip.abs_delta_trans(from), clip.abs_delta_trans(to))
+    };
     let end = old + advance.max(0.0);
     if !looping || end < 1.0 {
         return span(old, end.min(1.0));

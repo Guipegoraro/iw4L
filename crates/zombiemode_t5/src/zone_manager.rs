@@ -3,6 +3,7 @@
 //! spawners; a zone spawns while a player stands in it or in an enabled,
 //! connected neighbour.
 
+use crate::mapents::{TARGET, TARGETNAME};
 use std::collections::BTreeMap;
 
 use gsc_threads::{Cx, Thread, Yield};
@@ -36,7 +37,7 @@ pub fn zone_init(level: &mut Level, zone_name: &str) {
     let mut zone = Zone {
         volumes: level
             .ents
-            .array(zone_name, "targetname")
+            .array(zone_name, TARGETNAME)
             .into_iter()
             .filter(|&i| {
                 level
@@ -56,10 +57,10 @@ pub fn zone_init(level: &mut Level, zone_name: &str) {
         .volumes
         .first()
         .and_then(|&i| level.ents.get(i))
-        .and_then(|volume| volume.get("target"))
+        .and_then(|volume| volume.get(TARGET))
         .map(str::to_owned);
     if let Some(target) = target {
-        for spawner in level.ents.array(&target, "targetname") {
+        for spawner in level.ents.array(&target, TARGETNAME) {
             // `spawner.zone_name` and `is_enabled` are kept by the level's
             // spawner table; `level.ignore_spawner_func` is unset on Nacht.
             if level.ents.get(spawner).map(|e| e.classname()) == Some("actor_zombie_dog") {

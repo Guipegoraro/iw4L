@@ -102,14 +102,14 @@ pub use melee_charge::{
 pub use mode::{MoveMode, pm_set_move_mode};
 pub use noclip::{NOCLIP_SPEED, pm_noclip_move};
 pub use pml::Pml;
-pub use skate_tricks::{SKATE_TRICKS, SkateTrick, skate_trick, skate_trick_id};
 pub use pmove::Pmove;
 pub use single::{
     GroundTraceInput, MoveBounds, PmoveResult, PmoveSingle, PmoveSingleContext, pm_move,
 };
 pub use skate::{SkateOutcome, SkateTuning, pm_skate_land, pm_skate_move, pm_skate_tick};
+pub use skate_tricks::{SKATE_TRICKS, SkateTrick, skate_trick, skate_trick_id};
 pub(crate) use slide::pm_project_velocity;
-pub use slide::{pm_slide_move, pm_step_slide_move};
+pub use slide::{STEP_SIZE, pm_slide_move, pm_step_slide_move};
 pub use snap::{pm_end_tick_velocity, snap_vector};
 pub use sprint::{
     PERK_MARATHON, PMF_SPRINTING, SprintContext, SprintResult, bg_get_max_sprint_time,

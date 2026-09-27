@@ -3,6 +3,13 @@
 //! struct was placed with.
 
 /// One entity from the map's entity string, in map order.
+/// The key naming the entity another one points at (`ent.target`).
+pub const TARGET: &str = "target";
+/// The key other entities point at, and `getent( name, "targetname" )`.
+pub const TARGETNAME: &str = "targetname";
+/// `ent.script_string`.
+pub const SCRIPT_STRING: &str = "script_string";
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct MapEnt {
     pub fields: Vec<(String, String)>,

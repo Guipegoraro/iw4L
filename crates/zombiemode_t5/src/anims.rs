@@ -90,14 +90,31 @@ pub enum MoveSpeed {
     Sprint,
 }
 
+/// `set_run_speed`: `RandomIntRange( level.zombie_move_speed,
+/// level.zombie_move_speed + 35 )`, the width of the roll.
+pub const RUN_SPEED_ROLL: i32 = 35;
+/// `set_run_speed`: a roll at or under this walks.
+pub const WALK_MAX_ROLL: i32 = 35;
+/// `set_run_speed`: a roll at or under this (and over the walk's) runs;
+/// above it sprints.
+pub const RUN_MAX_ROLL: i32 = 70;
+
+/// `set_zombie_run_cycle`: `RandomIntRange( 1, 8 )`, walk1 to walk7.
+pub const WALK_CYCLES: usize = 7;
+/// `set_zombie_run_cycle`: `RandomIntRange( 1, 6 )`, run1 to run5.
+pub const RUN_CYCLES: usize = 5;
+/// `set_zombie_run_cycle`: `RandomIntRange( 1, 4 )`, sprint1 to sprint3.
+pub const SPRINT_CYCLES: usize = 3;
+
 /// `maps\_zombiemode_spawner.gsc::set_run_speed`: a roll in
-/// `level.zombie_move_speed .. +35` picks walk (≤ 35), run (≤ 70) or sprint.
+/// `level.zombie_move_speed ..` [`RUN_SPEED_ROLL`] more picks walk, run or
+/// sprint.
 pub fn set_run_speed(level: &mut Level) -> MoveSpeed {
     // `RandomIntRange( min, max )` is `min .. max - 1`.
-    let roll = level.zombie_move_speed + level.random_int(35);
-    if roll <= 35 {
+    let roll = level.zombie_move_speed + level.random_int(RUN_SPEED_ROLL);
+    if roll <= WALK_MAX_ROLL {
         MoveSpeed::Walk
-    } else if roll <= 70 {
+    } else if roll <= RUN_MAX_ROLL {
         MoveSpeed::Run
     } else {
         MoveSpeed::Sprint
@@ -105,13 +122,13 @@ pub fn set_run_speed(level: &mut Level) -> MoveSpeed {
 }
 
 /// `maps\_zombiemode_spawner.gsc::set_zombie_run_cycle`: the move clip for
-/// `speed` (`RandomIntRange( 1, 8 )` over the walks, `( 1, 6 )` over the
-/// runs, `( 1, 4 )` over the sprints).
+/// `speed`, among the first [`WALK_CYCLES`], [`RUN_CYCLES`] or
+/// [`SPRINT_CYCLES`] of its list.
 pub fn set_zombie_run_cycle(level: &mut Level, speed: MoveSpeed) -> &'static str {
     let pool: &[&'static str] = match speed {
-        MoveSpeed::Walk => &WALK[..7],
-        MoveSpeed::Run => &RUN[..5],
-        MoveSpeed::Sprint => &SPRINT[..3],
+        MoveSpeed::Walk => &WALK[..WALK_CYCLES],
+        MoveSpeed::Run => &RUN[..RUN_CYCLES],
+        MoveSpeed::Sprint => &SPRINT[..SPRINT_CYCLES],
     };
     pool[level.random_int(pool.len() as i32) as usize]
 }

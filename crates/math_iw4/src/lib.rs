@@ -13,4 +13,4 @@ pub use angles::{
 };
 pub use lean::{add_lean_to_position, get_lean_fraction};
 pub use mat::{matrix_multiply, matrix_multiply43, matrix_transform_vector43};
-pub use vec::vec3_length;
+pub use vec::{vec3_distance, vec3_distance_2d, vec3_length};

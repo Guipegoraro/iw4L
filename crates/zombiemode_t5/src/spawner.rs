@@ -12,9 +12,9 @@ use gsc_threads::{Cx, Owner, Thread, Yield, call};
 
 use crate::Level;
 use crate::actor::{self, BAD_PATH, DEATH, GOAL, Orient, actor_owner};
+use crate::mapents::{SCRIPT_STRING, TARGET, TARGETNAME};
+use crate::zombiemode::INTERMISSION;
 
-/// `level endon( "intermission" )`.
-pub const INTERMISSION: &str = "intermission";
 /// `self notify( "zombie_acquire_enemy" )`: `find_flesh` picks again.
 pub const ZOMBIE_ACQUIRE_ENEMY: &str = "zombie_acquire_enemy";
 /// `self notify( "path_timer_done" )`.
@@ -22,8 +22,6 @@ pub const PATH_TIMER_DONE: &str = "path_timer_done";
 /// `self notify( "stop_zombie_bad_path" )`: `zombie_bad_path()` has its answer.
 pub const STOP_ZOMBIE_BAD_PATH: &str = "stop_zombie_bad_path";
 
-/// The spawner key `should_skip_teardown` reads.
-pub const SCRIPT_STRING: &str = "script_string";
 /// `self.script_string == "zombie_chaser"`: skips the window.
 pub const ZOMBIE_CHASER: &str = "zombie_chaser";
 
@@ -54,14 +52,45 @@ pub const ASSURE_NODE_RETRY_WAIT: f32 = 2.0;
 pub const ASSURE_NODE_CLOSEST: usize = 20;
 /// `wait( 20 )` before `zombie_assure_node` gives up on the zombie, seconds.
 pub const ASSURE_NODE_GIVE_UP: f32 = 20.0;
+/// `wait( 1 )` in `find_flesh` when no player is valid, seconds.
+pub const FIND_FLESH_NO_PLAYER_WAIT: f32 = 1.0;
+/// `RandomFloatRange( 1, 3 )` in `find_flesh`: seconds before it picks an
+/// enemy again.
+pub const FIND_FLESH_REPICK: (f32, f32) = (1.0, 3.0);
+/// `wait( 0.1 )` at the end of each `zombie_follow_enemy` pass, seconds.
+pub const FOLLOW_ENEMY_TICK: f32 = 0.1;
+
+/// One of `zombie_follow_enemy`'s distance tiers: an enemy further than
+/// `beyond` adds `base + RandomFloat( spread )` seconds to the pass.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FollowTier {
+    pub beyond: f32,
+    pub base: f32,
+    pub spread: f32,
+}
+
+/// `zombie_follow_enemy`'s tiers, furthest first (`distSq > 3200 * 3200`…).
+pub const FOLLOW_ENEMY_TIERS: [FollowTier; 3] = [
+    FollowTier {
+        beyond: 3200.0,
+        base: 2.0,
+        spread: 1.0,
+    },
+    FollowTier {
+        beyond: 2200.0,
+        base: 1.0,
+        spread: 0.5,
+    },
+    FollowTier {
+        beyond: 1200.0,
+        base: 0.5,
+        spread: 0.5,
+    },
+];
 
 /// The actor number of a zombie's script owner.
 pub fn actor_number(owner: Owner) -> u32 {
     (owner.0 - actor_owner(0).0) as u32
-}
-
-fn distance(a: [f32; 3], b: [f32; 3]) -> f32 {
-    ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt()
 }
 
 /// `self SetGoalPos( goal )` with `self.goalradius = radius`.
@@ -75,8 +104,8 @@ fn set_goal_pos(level: &mut Level, actor: u32, goal: [f32; 3], radius: f32) {
 /// `maps\_zombiemode_spawner.gsc::get_desired_origin`: the origin of the
 /// entity, struct or node the spawner targets.
 pub fn get_desired_origin(level: &Level, spawner: u32) -> Option<[f32; 3]> {
-    let target = level.ents.get(spawner)?.get("target")?;
-    let ent = *level.ents.array(target, "targetname").first()?;
+    let target = level.ents.get(spawner)?.get(TARGET)?;
+    let ent = *level.ents.array(target, TARGETNAME).first()?;
     level.ents.get(ent).map(|ent| ent.origin())
 }
 
@@ -84,7 +113,9 @@ pub fn get_desired_origin(level: &Level, spawner: u32) -> Option<[f32; 3]> {
 /// max )`: the closest `max` origins to `org`, nearest first.
 pub fn get_array_of_closest(org: [f32; 3], array: &[[f32; 3]], max: usize) -> Vec<[f32; 3]> {
     let mut sorted = array.to_vec();
-    sorted.sort_by(|a, b| distance(org, *a).total_cmp(&distance(org, *b)));
+    sorted.sort_by(|a, b| {
+        math_iw4::vec3_distance(org, *a).total_cmp(&math_iw4::vec3_distance(org, *b))
+    });
     sorted.truncate(max);
     sorted
 }
@@ -93,7 +124,7 @@ pub fn get_array_of_closest(org: [f32; 3], array: &[[f32; 3]], max: usize) -> Ve
 pub fn exterior_goals(level: &Level) -> Vec<[f32; 3]> {
     level
         .ents
-        .array(EXTERIOR_GOAL, "targetname")
+        .array(EXTERIOR_GOAL, TARGETNAME)
         .into_iter()
         .filter_map(|ent| level.ents.get(ent).map(|ent| ent.origin()))
         .collect()
@@ -141,9 +172,9 @@ pub fn pick_entrance(level: &mut Level, spawner: u32, origin: [f32; 3]) -> Optio
     let nodes = get_array_of_closest(origin, &goals, ENTRANCE_CANDIDATES);
     let first = *nodes.first()?;
     let mut entrance_nodes = vec![first];
-    let mut prev_dist = distance(origin, first);
+    let mut prev_dist = math_iw4::vec3_distance(origin, first);
     for node in &nodes[1..] {
-        let dist = distance(origin, *node);
+        let dist = math_iw4::vec3_distance(origin, *node);
         if dist - prev_dist > MAX_BARRIER_SEARCH_DIST {
             break;
         }
@@ -168,7 +199,10 @@ pub fn get_closest_valid_player(level: &Level, origin: [f32; 3]) -> Option<i32> 
         .players
         .iter()
         .filter(|player| player.alive)
-        .min_by(|a, b| distance(origin, a.origin).total_cmp(&distance(origin, b.origin)))
+        .min_by(|a, b| {
+            math_iw4::vec3_distance(origin, a.origin)
+                .total_cmp(&math_iw4::vec3_distance(origin, b.origin))
+        })
         .map(|player| player.entnum)
 }
 
@@ -434,14 +468,14 @@ impl Thread<Level> for FindFlesh {
                         return Yield::Done;
                     };
                     let Some(player) = get_closest_valid_player(level, origin) else {
-                        return Yield::wait_seconds(1.0);
+                        return Yield::wait_seconds(FIND_FLESH_NO_PLAYER_WAIT);
                     };
                     if let Some(zombie) = level.zombies.get_mut(&actor) {
                         zombie.favorite_enemy = Some(player);
                     }
                     // `self thread zombie_pathing()`, which with an enemy and
                     // no point of interest is `zombie_follow_enemy()`.
-                    let delay = level.random_float_range(1.0, 3.0);
+                    let delay = level.random_float_range(FIND_FLESH_REPICK.0, FIND_FLESH_REPICK.1);
                     cx.thread(owner, ZombieFollowEnemy::default());
                     self.pc = 2;
                     return Yield::wait_seconds(delay);
@@ -491,17 +525,11 @@ impl Thread<Level> for ZombieFollowEnemy {
                 zombie.motor.orient = Orient::Motion;
             }
             set_goal_pos(level, actor, enemy, FIND_FLESH_GOAL_RADIUS);
-            let dist = distance(origin, enemy);
-            extra_wait = if dist > 3200.0 {
-                2.0 + level.random_float_range(0.0, 1.0)
-            } else if dist > 2200.0 {
-                1.0 + level.random_float_range(0.0, 0.5)
-            } else if dist > 1200.0 {
-                0.5 + level.random_float_range(0.0, 0.5)
-            } else {
-                0.0
-            };
+            let dist = math_iw4::vec3_distance(origin, enemy);
+            if let Some(tier) = FOLLOW_ENEMY_TIERS.iter().find(|tier| dist > tier.beyond) {
+                extra_wait = tier.base + level.random_float_range(0.0, tier.spread);
+            }
         }
-        Yield::wait_seconds(extra_wait + 0.1)
+        Yield::wait_seconds(extra_wait + FOLLOW_ENEMY_TICK)
     }
 }

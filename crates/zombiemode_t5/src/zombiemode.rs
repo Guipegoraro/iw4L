@@ -6,6 +6,13 @@ use crate::Level;
 use crate::level::{EngineCommand, PlayerScore};
 use crate::utility::{ZombieVar, set_zombie_var};
 
+/// `level notify( "intermission" )`: the game is over.
+pub const INTERMISSION: &str = "intermission";
+/// `level notify( "end_of_round" )`.
+pub const END_OF_ROUND: &str = "end_of_round";
+/// `level notify( "restart_round" )`.
+pub const RESTART_ROUND: &str = "restart_round";
+
 /// Set by the engine side once every expected player is in (see
 /// [`crate::ZombiesMode`]); `maps\_callbackglobal.gsc::synchronize_players`
 /// gives its meaning: connected players == expected players.
@@ -321,7 +328,7 @@ impl Thread<Level> for RoundThink {
                         return wait;
                     }
                     cx.world.first_round = false;
-                    cx.notify(Owner::LEVEL, "end_of_round", Vec::new());
+                    cx.notify(Owner::LEVEL, END_OF_ROUND, Vec::new());
                     self.chalk_round_over = ChalkRoundOver::default();
                     self.pc = 3;
                 }
@@ -469,7 +476,7 @@ impl Thread<Level> for RoundSpawning {
         loop {
             match self.pc {
                 0 => {
-                    for event in ["intermission", "end_of_round", "restart_round"] {
+                    for event in [INTERMISSION, END_OF_ROUND, RESTART_ROUND] {
                         cx.endon(Owner::LEVEL, event);
                     }
                     let level = &mut *cx.world;

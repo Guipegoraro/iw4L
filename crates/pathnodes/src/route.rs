@@ -5,6 +5,7 @@
 //! ground under the actor, which the caller traces.
 
 use crate::PathGraph;
+use math_iw4::vec3_distance_2d;
 
 /// How far from an endpoint the search looks for the node to start or end on.
 pub const ROUTE_NODE_SEARCH_RADIUS: f32 = 512.0;
@@ -29,10 +30,6 @@ pub struct RouteStep {
     pub heading: Option<[f32; 2]>,
     /// Within the goal radius of the last waypoint.
     pub arrived: bool,
-}
-
-fn flat_distance(a: [f32; 3], b: [f32; 3]) -> f32 {
-    ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2)).sqrt()
 }
 
 /// How far along the ray `at + dir * t`, `t` in `0..=len`, it first comes
@@ -72,7 +69,7 @@ impl PathGraph {
         // the second waypoint than the first waypoint is, it is already on
         // its way and the first is skipped.
         if waypoints.len() >= 2
-            && flat_distance(from, waypoints[1]) < flat_distance(waypoints[0], waypoints[1])
+            && vec3_distance_2d(from, waypoints[1]) < vec3_distance_2d(waypoints[0], waypoints[1])
         {
             waypoints.remove(0);
         }
@@ -97,7 +94,7 @@ impl Route {
     /// Within `goal_radius` of the goal, in the ground plane.
     pub fn at_goal(&self, origin: [f32; 3], goal_radius: f32) -> bool {
         self.goal()
-            .is_some_and(|goal| flat_distance(origin, goal) <= goal_radius)
+            .is_some_and(|goal| vec3_distance_2d(origin, goal) <= goal_radius)
     }
 
     /// Moves `origin` up to `distance` units along the waypoints, stopping at
@@ -122,7 +119,7 @@ impl Route {
                 };
             };
             let last = self.next + 1 == self.waypoints.len();
-            let to_target = flat_distance(at, target);
+            let to_target = vec3_distance_2d(at, target);
             if !last && to_target <= WAYPOINT_REACHED {
                 self.next += 1;
                 continue;

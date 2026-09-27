@@ -6,6 +6,7 @@ license.workspace = true
 description = "A map's path nodes and the search AI walks them with: nearest node, A* over the authored links."
 
 [dependencies]
+math_iw4.workspace = true
 
 [lints]
 workspace = true

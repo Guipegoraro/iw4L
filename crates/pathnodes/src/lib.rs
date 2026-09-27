@@ -17,6 +17,8 @@ pub use route::{ROUTE_NODE_SEARCH_RADIUS, Route, RouteStep};
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 
+use math_iw4::vec3_distance;
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PathNode {
     pub origin: [f32; 3],
@@ -42,11 +44,6 @@ pub struct PathLink {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PathGraph {
     pub nodes: Vec<PathNode>,
-}
-
-fn distance(a: [f32; 3], b: [f32; 3]) -> f32 {
-    let d = [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-    (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt()
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -126,7 +123,7 @@ impl PathGraph {
         self.nodes
             .iter()
             .enumerate()
-            .map(|(i, node)| (i as u32, distance(node.origin, origin)))
+            .map(|(i, node)| (i as u32, vec3_distance(node.origin, origin)))
             .filter(|&(_, d)| d <= max_dist)
             .min_by(|a, b| a.1.total_cmp(&b.1).then(a.0.cmp(&b.0)))
             .map(|(i, _)| i)
@@ -146,7 +143,7 @@ impl PathGraph {
         let mut open = BinaryHeap::new();
         cost[from_i] = 0.0;
         open.push(Open {
-            estimate: distance(self.nodes[from_i].origin, goal),
+            estimate: vec3_distance(self.nodes[from_i].origin, goal),
             node: from,
         });
         while let Some(Open { node, .. }) = open.pop() {
@@ -175,7 +172,7 @@ impl PathGraph {
                     cost[next] = through;
                     came_from[next] = node;
                     open.push(Open {
-                        estimate: through + distance(self.nodes[next].origin, goal),
+                        estimate: through + vec3_distance(self.nodes[next].origin, goal),
                         node: link.to,
                     });
                 }

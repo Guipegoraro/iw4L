@@ -65,7 +65,7 @@ impl ZombiesMode {
                 |point| engine.ground_z(point),
             );
             if let Some((clip, looping)) = zombie.motor.take_restart() {
-                engine.actor_play_anim(actor, clip, looping, 1.0);
+                engine.actor_play_anim(actor, clip, looping, actor::ANIM_RATE);
             }
             engine.set_actor_origin(actor, zombie.motor.origin, zombie.motor.yaw);
             let owner = actor_owner(actor);
@@ -139,7 +139,7 @@ impl ModeScript for ZombiesMode {
                     };
                     match engine.spawn_actor(actor, body, &[head], origin, yaw) {
                         Ok(_) => {
-                            engine.actor_play_anim(actor, anim, true, 1.0);
+                            engine.actor_play_anim(actor, anim, true, actor::ANIM_RATE);
                             // `spawner add_spawn_function( zombie_spawn_init )`
                             // ends in `self thread zombie_think()`.
                             self.threads

@@ -13,7 +13,8 @@ const PROJECT_NORMAL_Z_EPSILON: f32 = 0.001;
 
 const MAX_CLIP_PLANES: usize = 8;
 
-const STEP_SIZE: f32 = 18.0;
+/// The highest ledge a step climbs without a jump.
+pub const STEP_SIZE: f32 = 18.0;
 
 const PRONE_STEP_SIZE: f32 = 10.0;
 

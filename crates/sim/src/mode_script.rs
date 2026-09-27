@@ -13,8 +13,9 @@ use crate::frame::FrameWorld;
 use crate::match_state::ClientLifecycle;
 use crate::world::{ClientId, Tick};
 
-/// How far above an actor the ground trace starts: the height it may step up.
-pub const ACTOR_STEP_HEIGHT: f32 = 18.0;
+/// How far above an actor the ground trace starts: the height it may step up,
+/// the same step a player takes.
+pub const ACTOR_STEP_HEIGHT: f32 = movement_iw4::STEP_SIZE;
 
 /// How far below an actor the ground trace looks: the drop it may step down.
 pub const ACTOR_GROUND_PROBE: f32 = 64.0;

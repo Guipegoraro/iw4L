@@ -25,10 +25,6 @@ pub const NOTE_STOP: &str = "stop";
 /// The dvar default, not read from the zone.
 pub const AI_MELEE_RANGE: f32 = 64.0;
 
-fn distance(a: [f32; 3], b: [f32; 3]) -> f32 {
-    ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt()
-}
-
 /// The zombie's origin and its living enemy's, when it has one.
 fn zombie_and_enemy(level: &Level, actor: u32) -> Option<([f32; 3], i32, [f32; 3])> {
     let zombie = level.zombies.get(&actor)?;
@@ -41,8 +37,9 @@ fn in_melee_range(level: &Level, actor: u32) -> bool {
     let Some(zombie) = level.zombies.get(&actor) else {
         return false;
     };
-    zombie_and_enemy(level, actor)
-        .is_some_and(|(origin, _, enemy)| distance(origin, enemy) <= zombie.melee_attack_dist)
+    zombie_and_enemy(level, actor).is_some_and(|(origin, _, enemy)| {
+        math_iw4::vec3_distance(origin, enemy) <= zombie.melee_attack_dist
+    })
 }
 
 /// Every server frame: an enemy within `meleeAttackDist` starts
@@ -169,7 +166,7 @@ impl Thread<Level> for MeleeCombat {
                     }
                     if note == NOTE_FIRE
                         && let Some((origin, entnum, enemy)) = enemy
-                        && distance(origin, enemy) <= AI_MELEE_RANGE
+                        && math_iw4::vec3_distance(origin, enemy) <= AI_MELEE_RANGE
                     {
                         let amount = level
                             .zombies
