@@ -4,8 +4,10 @@
 //!
 //! Retail runs this in the engine's actor code; here it runs in the mode
 //! script, after the frame's threads, so it is cloned with the simulation
-//! for replay and prediction. [`Motor::step`] is pure: the clip and the
+//! for replay and prediction. [`Motor::step`] is pure: the clips and the
 //! ground come in as arguments.
+
+use std::sync::Arc;
 
 use gsc_threads::Owner;
 use pathnodes::{PathGraph, Route};
@@ -182,13 +184,14 @@ impl Motor {
                 .is_some_and(|goal| goal.route.is_some() && !goal.reached)
     }
 
-    /// One frame of `dt` seconds. `clip` is the playing clip's data (`None`
+    /// One frame of `dt` seconds. `clips` looks a clip's data up by name, and
+    /// is asked only once this frame's clip is chosen (a clip it does not know
     /// leaves the actor where it is); `ground` gives the floor height under a
     /// point.
     pub fn step(
         &mut self,
         dt: f32,
-        clip: Option<&AnimClip>,
+        clips: impl Fn(&str) -> Option<Arc<AnimClip>>,
         ground: impl Fn([f32; 3]) -> Option<f32>,
     ) -> Vec<MotorEvent> {
         let mut events = std::mem::take(&mut self.pending);
@@ -202,7 +205,8 @@ impl Motor {
                 self.play(want, true);
             }
         }
-        let Some(clip) = clip.filter(|clip| clip.duration() > 0.0) else {
+        let clip = clips(self.playing.clip);
+        let Some(clip) = clip.as_deref().filter(|clip| clip.duration() > 0.0) else {
             return events;
         };
         let old = self.playing.time;

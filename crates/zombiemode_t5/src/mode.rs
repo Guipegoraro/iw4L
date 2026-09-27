@@ -59,10 +59,11 @@ impl ZombiesMode {
     /// frame.
     fn step_actors(&mut self, engine: &mut ModeEngine<'_, '_>, dt: f32) {
         for (&actor, zombie) in &mut self.level.zombies {
-            let clip = engine.actor_clip(zombie.motor.clip());
-            let events = zombie
-                .motor
-                .step(dt, clip.as_deref(), |point| engine.ground_z(point));
+            let events = zombie.motor.step(
+                dt,
+                |clip| engine.actor_clip(clip),
+                |point| engine.ground_z(point),
+            );
             if let Some((clip, looping)) = zombie.motor.take_restart() {
                 engine.actor_play_anim(actor, clip, looping, 1.0);
             }
