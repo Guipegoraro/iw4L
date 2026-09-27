@@ -19,7 +19,9 @@
 //! one frame sees every event, in order. Retail runs it after each notify, so
 //! it is waiting again for the next; here the events that arrive while it is
 //! ready wait in its backlog, and each `waittill` it parks on this frame takes
-//! the first of them that matches.
+//! the first of them that matches. Its own notifies stay out of it: retail
+//! sends them while it runs, not while it waits. An `endon` among those events
+//! still kills it at once, before it sees the events that came first.
 
 use std::collections::{BTreeMap, VecDeque};
 use std::fmt;
@@ -401,6 +403,8 @@ impl<W> Scheduler<W> {
             let yielded = slot.thread.resume(&mut cx);
             let ops = cx.ops;
             report.resumed += 1;
+            // What it notifies now it sends while running, so it cannot hear it.
+            let backlog = slot.backlog.take();
             self.threads.insert(id, slot);
             for op in ops {
                 match op {
@@ -418,7 +422,8 @@ impl<W> Scheduler<W> {
                     Op::FlagClear(name) => self.set_flag(name, false),
                 }
             }
-            if self.threads.contains_key(&id) {
+            if let Some(slot) = self.threads.get_mut(&id) {
+                slot.backlog = backlog;
                 self.park(id, yielded, now_ms);
             }
         }
@@ -470,15 +475,20 @@ impl<W> Scheduler<W> {
             return;
         };
         let mut park = park;
-        if let Some(mut backlog) = slot.backlog.take()
-            && let Park::Till { owner, names } = &park
-        {
-            let matches = |event: &Event| event.owner == *owner && names.contains(&event.name);
-            if let Some(at) = backlog.iter().position(matches) {
-                slot.woke_by = backlog.drain(..=at).next_back();
-                slot.backlog = Some(backlog);
-                park = Park::Ready;
+        match (slot.backlog.take(), &park) {
+            (Some(mut backlog), Park::Till { owner, names }) => {
+                let matches = |event: &Event| event.owner == *owner && names.contains(&event.name);
+                if let Some(at) = backlog.iter().position(matches) {
+                    slot.woke_by = backlog.drain(..=at).next_back();
+                    slot.backlog = Some(backlog);
+                    park = Park::Ready;
+                }
             }
+            // A flag that is already set: it runs on at once, still this
+            // frame, and its next `waittill` may still take the backlog.
+            (backlog, Park::Ready) => slot.backlog = backlog,
+            // Any other wait outlasts the frame: retail would miss them too.
+            _ => {}
         }
         let now_ready = park == Park::Ready;
         slot.park = park;
