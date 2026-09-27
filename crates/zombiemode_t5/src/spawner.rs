@@ -13,6 +13,7 @@ use sim::ClientId;
 
 use crate::Level;
 use crate::actor::{self, BAD_PATH, DEATH, GOAL, Orient, actor_number};
+use crate::level::Zombie;
 use crate::mapents::{SCRIPT_STRING, TARGET, TARGETNAME};
 use crate::zombiemode::INTERMISSION;
 
@@ -55,9 +56,11 @@ pub const ASSURE_NODE_CLOSEST: usize = 20;
 pub const ASSURE_NODE_GIVE_UP: f32 = 20.0;
 /// `wait( 1 )` in `find_flesh` when no player is valid, seconds.
 pub const FIND_FLESH_NO_PLAYER_WAIT: f32 = 1.0;
-/// `RandomFloatRange( 1, 3 )` in `find_flesh`: seconds before it picks an
-/// enemy again.
-pub const FIND_FLESH_REPICK: (f32, f32) = (1.0, 3.0);
+/// `RandomFloatRange( 1, 3 )` in `find_flesh`: the fewest seconds before it
+/// picks an enemy again.
+pub const FIND_FLESH_REPICK_MIN: f32 = 1.0;
+/// The most seconds before `find_flesh` picks again.
+pub const FIND_FLESH_REPICK_MAX: f32 = 3.0;
 /// `wait( 0.1 )` at the end of each `zombie_follow_enemy` pass, seconds.
 pub const FOLLOW_ENEMY_TICK: f32 = 0.1;
 
@@ -220,7 +223,9 @@ impl Thread<Level> for ZombieThink {
             // `should_skip_teardown`, or a map with no windows (retail
             // asserts): hunt at once.
             Some(Entrance::SkipTeardown) | None => {
-                zombie_setup_attack_properties(level, actor);
+                if let Some(zombie) = level.zombies.get_mut(&actor) {
+                    zombie_setup_attack_properties(zombie);
+                }
                 cx.thread(owner, FindFlesh::default());
             }
         }
@@ -228,11 +233,9 @@ impl Thread<Level> for ZombieThink {
     }
 }
 
-/// `self zombie_setup_attack_properties()`.
-fn zombie_setup_attack_properties(level: &mut Level, actor: u32) {
-    if let Some(zombie) = level.zombies.get_mut(&actor) {
-        zombie.setup_attack_properties();
-    }
+/// `maps\_zombiemode_spawner.gsc::zombie_setup_attack_properties`.
+pub fn zombie_setup_attack_properties(zombie: &mut Zombie) {
+    zombie.melee_attack_dist = Some(MELEE_ATTACK_DIST);
 }
 
 /// `maps\_zombiemode_spawner.gsc::zombie_goto_entrance`.
@@ -262,7 +265,9 @@ impl Thread<Level> for ZombieGotoEntrance {
         }
         // `tear_into_building()` and the window traversal come with ZMB-037
         // and ZMB-036.
-        zombie_setup_attack_properties(cx.world, actor);
+        if let Some(zombie) = cx.world.zombies.get_mut(&actor) {
+            zombie_setup_attack_properties(zombie);
+        }
         cx.thread(owner, FindFlesh::default());
         Yield::Done
     }
@@ -464,7 +469,8 @@ impl Thread<Level> for FindFlesh {
                     }
                     // `self thread zombie_pathing()`, which with an enemy and
                     // no point of interest is `zombie_follow_enemy()`.
-                    let delay = level.random_float_range(FIND_FLESH_REPICK.0, FIND_FLESH_REPICK.1);
+                    let delay =
+                        level.random_float_range(FIND_FLESH_REPICK_MIN, FIND_FLESH_REPICK_MAX);
                     cx.thread(owner, ZombieFollowEnemy::default());
                     self.pc = 2;
                     return Yield::wait_seconds(delay);

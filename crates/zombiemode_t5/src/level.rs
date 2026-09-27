@@ -65,29 +65,14 @@ pub struct Zombie {
     pub favorite_enemy: Option<ClientId>,
     /// `self.meleeDamage`.
     pub melee_damage: i32,
-    /// `self.meleeAttackDist`, set by `zombie_setup_attack_properties`.
-    pub melee_attack_dist: f32,
+    /// `self.meleeAttackDist`, once `zombie_setup_attack_properties` sets it
+    /// (the aitype's own value is not read).
+    pub melee_attack_dist: Option<f32>,
     /// In `MeleeCombat`.
     pub meleeing: bool,
     /// `self.zombie_bad_path`: what the last `zombie_bad_path()` saw, a
     /// `bad_path` (true) or its timeout (false); `None` while it waits.
     pub zombie_bad_path: Option<bool>,
-}
-
-impl Zombie {
-    /// `maps\_zombiemode_spawner.gsc::zombie_setup_attack_properties`.
-    pub fn setup_attack_properties(&mut self) {
-        self.melee_attack_dist = crate::spawner::MELEE_ATTACK_DIST;
-    }
-
-    /// The end of `MeleeCombat`: back to walking, facing where it goes
-    /// (`self OrientMode( "face default" )`).
-    pub fn end_melee(&mut self) {
-        self.meleeing = false;
-        self.motor.stop_scripted();
-        self.motor.anim_mode = crate::actor::AnimMode::Walk;
-        self.motor.orient = crate::actor::Orient::Motion;
-    }
 }
 
 #[derive(Clone, Debug, Default)]

@@ -32,7 +32,7 @@ struct Engagement {
     origin: [f32; 3],
     enemy: ClientId,
     enemy_origin: [f32; 3],
-    melee_attack_dist: f32,
+    melee_attack_dist: Option<f32>,
 }
 
 impl Engagement {
@@ -54,7 +54,8 @@ impl Engagement {
 
     /// Close enough to start or keep swinging (`meleeAttackDist`).
     fn in_reach(&self) -> bool {
-        self.distance() <= self.melee_attack_dist
+        self.melee_attack_dist
+            .is_some_and(|reach| self.distance() <= reach)
     }
 }
 
@@ -119,9 +120,14 @@ pub struct MeleeCombat {
 }
 
 impl MeleeCombat {
+    /// Back to walking, facing where it goes (`self OrientMode( "face
+    /// default" )`, `self AnimMode( "none" )`).
     fn finish(level: &mut Level, actor: u32) {
         if let Some(zombie) = level.zombies.get_mut(&actor) {
-            zombie.end_melee();
+            zombie.meleeing = false;
+            zombie.motor.stop_scripted();
+            zombie.motor.anim_mode = AnimMode::Walk;
+            zombie.motor.orient = Orient::Motion;
         }
     }
 }

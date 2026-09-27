@@ -3,12 +3,15 @@
 //! spawners; a zone spawns while a player stands in it or in an enabled,
 //! connected neighbour.
 
-use crate::mapents::{TARGET, TARGETNAME};
 use std::collections::BTreeMap;
 
 use gsc_threads::{Cx, Thread, Yield};
 
 use crate::Level;
+use crate::mapents::{TARGET, TARGETNAME};
+
+/// `spawner.classname == "actor_zombie_dog"`: a dog spawner, kept apart.
+pub const ACTOR_ZOMBIE_DOG: &str = "actor_zombie_dog";
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Zone {
@@ -63,7 +66,7 @@ pub fn zone_init(level: &mut Level, zone_name: &str) {
         for spawner in level.ents.array(&target, TARGETNAME) {
             // `spawner.zone_name` and `is_enabled` are kept by the level's
             // spawner table; `level.ignore_spawner_func` is unset on Nacht.
-            if level.ents.get(spawner).map(|e| e.classname()) == Some("actor_zombie_dog") {
+            if level.ents.get(spawner).map(|e| e.classname()) == Some(ACTOR_ZOMBIE_DOG) {
                 zone.dog_spawners.push(spawner);
             } else {
                 zone.spawners.push(spawner);

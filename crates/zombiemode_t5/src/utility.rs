@@ -131,7 +131,7 @@ pub fn spawn_zombie(level: &mut crate::Level, spawner: u32) -> Option<u32> {
             move_speed,
             favorite_enemy: None,
             melee_damage: ZOMBIE_MELEE_DAMAGE,
-            melee_attack_dist: crate::spawner::MELEE_ATTACK_DIST,
+            melee_attack_dist: None,
             meleeing: false,
             zombie_bad_path: None,
         },
