@@ -61,7 +61,8 @@ pub enum Orient {
 /// `AnimMode`: whether the clip's root motion moves the actor.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum AnimMode {
-    /// Along the route to the goal.
+    /// `"none"`: the clip's root motion carries it along the route to the
+    /// goal.
     #[default]
     Walk,
     /// `"zonly_physics"`: in place (melee).
@@ -81,6 +82,7 @@ pub enum MotorEvent {
 
 #[derive(Clone, Debug, PartialEq)]
 struct Goal {
+    pos: [f32; 3],
     route: Option<Route>,
     radius: f32,
     reached: bool,
@@ -153,11 +155,17 @@ impl Motor {
             self.pending.push(MotorEvent::BadPath);
         }
         self.goal = Some(Goal {
+            pos: goal,
             route,
             radius,
             reached: false,
             bad_path_in: ACTOR_BAD_PATH_REPEAT,
         });
+    }
+
+    /// `self.goalpos`: where the last `SetGoalPos` sent it.
+    pub fn goal_pos(&self) -> Option<[f32; 3]> {
+        self.goal.as_ref().map(|goal| goal.pos)
     }
 
     pub fn at_goal(&self) -> bool {
