@@ -4,14 +4,14 @@
 //!
 //! Not ported yet: rising from the ground and window traversals (ZMB-036),
 //! tearing the boards off (`tear_into_building`, ZMB-037: until then a zombie
-//! at its window goes straight to `find_flesh`), `zombie_assure_node`, the
-//! breadcrumbs of `zombie_pathing` for an unreachable player, points of
+//! at its window goes straight to `find_flesh`), the timeout death at the end
+//! of `zombie_assure_node` (ZMB-041), the breadcrumbs of `zombie_pathing` for an unreachable player, points of
 //! interest, and the ignore list that splits a crowd between players.
 
-use gsc_threads::{Cx, Owner, Thread, Yield};
+use gsc_threads::{Cx, Owner, Thread, Yield, call};
 
 use crate::Level;
-use crate::actor::{self, DEATH, GOAL, Orient, actor_owner};
+use crate::actor::{self, BAD_PATH, DEATH, GOAL, Orient, actor_owner};
 
 /// `level endon( "intermission" )`.
 pub const INTERMISSION: &str = "intermission";
@@ -19,6 +19,13 @@ pub const INTERMISSION: &str = "intermission";
 pub const ZOMBIE_ACQUIRE_ENEMY: &str = "zombie_acquire_enemy";
 /// `self notify( "path_timer_done" )`.
 pub const PATH_TIMER_DONE: &str = "path_timer_done";
+/// `self notify( "stop_zombie_bad_path" )`: `zombie_bad_path()` has its answer.
+pub const STOP_ZOMBIE_BAD_PATH: &str = "stop_zombie_bad_path";
+
+/// The spawner key `should_skip_teardown` reads.
+pub const SCRIPT_STRING: &str = "script_string";
+/// `self.script_string == "zombie_chaser"`: skips the window.
+pub const ZOMBIE_CHASER: &str = "zombie_chaser";
 
 /// `level.exterior_goals = getstructarray( "exterior_goal", "targetname" )`
 /// (`maps\_zombiemode_blockers.gsc::init`).
@@ -32,6 +39,21 @@ pub const ENTRANCE_GOAL_RADIUS: f32 = 128.0;
 pub const FIND_FLESH_GOAL_RADIUS: f32 = 32.0;
 /// `self.meleeAttackDist` from `zombie_setup_attack_properties`.
 pub const MELEE_ATTACK_DIST: f32 = 64.0;
+/// `get_array_of_closest( origin, level.exterior_goals, undefined, 3 )` in
+/// `zombie_think`: the windows an untargeted zombie picks among.
+pub const ENTRANCE_CANDIDATES: usize = 3;
+/// `zombie_bad_path_timeout`: how long `zombie_bad_path()` waits for a
+/// `bad_path` before it answers no, seconds.
+pub const ZOMBIE_BAD_PATH_TIMEOUT: f32 = 2.0;
+/// `wait( 0.05 )` in `zombie_bad_path()`'s poll, seconds.
+pub const ZOMBIE_BAD_PATH_POLL: f32 = 0.05;
+/// `wait( 2 )` in `zombie_assure_node` before it widens the search, seconds.
+pub const ASSURE_NODE_RETRY_WAIT: f32 = 2.0;
+/// `get_array_of_closest( self.origin, level.exterior_goals, undefined, 20 )`
+/// in `zombie_assure_node`.
+pub const ASSURE_NODE_CLOSEST: usize = 20;
+/// `wait( 20 )` before `zombie_assure_node` gives up on the zombie, seconds.
+pub const ASSURE_NODE_GIVE_UP: f32 = 20.0;
 
 /// The actor number of a zombie's script owner.
 pub fn actor_number(owner: Owner) -> u32 {
@@ -67,22 +89,58 @@ pub fn get_array_of_closest(org: [f32; 3], array: &[[f32; 3]], max: usize) -> Ve
     sorted
 }
 
-/// The entrance a zombie from `spawner` standing at `origin` walks to: of the
-/// three windows closest to the spawner's target, those not more than
-/// `max_dist` further (from the zombie) than the previous one, then one of
-/// them at random. `None` when the map has no `exterior_goal`.
-pub fn pick_entrance(level: &mut Level, spawner: u32, origin: [f32; 3]) -> Option<[f32; 3]> {
-    let goals: Vec<[f32; 3]> = level
+/// `level.exterior_goals`: every window's origin.
+pub fn exterior_goals(level: &Level) -> Vec<[f32; 3]> {
+    level
         .ents
         .array(EXTERIOR_GOAL, "targetname")
         .into_iter()
         .filter_map(|ent| level.ents.get(ent).map(|ent| ent.origin()))
-        .collect();
-    let from = get_desired_origin(level, spawner).unwrap_or(origin);
-    let nodes = get_array_of_closest(from, &goals, 3);
+        .collect()
+}
+
+/// `should_skip_teardown`, for a zombie that did not rise: its spawner's
+/// `script_string` is `zombie_chaser`.
+pub fn should_skip_teardown(level: &Level, spawner: u32) -> bool {
+    level
+        .ents
+        .get(spawner)
+        .and_then(|ent| ent.get(SCRIPT_STRING))
+        .is_some_and(|value| value == ZOMBIE_CHASER)
+}
+
+/// Where `zombie_think` sends a zombie.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Entrance {
+    /// The spawner has a target: the one window closest to it.
+    Forced([f32; 3]),
+    /// No target: `node`, picked at random among `entrance_nodes`, which
+    /// `zombie_assure_node` falls back on.
+    Picked {
+        node: [f32; 3],
+        entrance_nodes: Vec<[f32; 3]>,
+    },
+    /// `should_skip_teardown`: no window, straight to `find_flesh`.
+    SkipTeardown,
+}
+
+/// `zombie_think`'s choice for a zombie from `spawner` standing at `origin`
+/// (not a riser). `None` when the map has no `exterior_goal`.
+pub fn pick_entrance(level: &mut Level, spawner: u32, origin: [f32; 3]) -> Option<Entrance> {
+    let goals = exterior_goals(level);
+    // `IsDefined( self.target ) && self.target != ""`: retail asserts the
+    // target exists; a missing one falls through to the untargeted pick here.
+    if let Some(target) = get_desired_origin(level, spawner) {
+        return get_array_of_closest(target, &goals, 1)
+            .first()
+            .map(|node| Entrance::Forced(*node));
+    }
+    if should_skip_teardown(level, spawner) {
+        return Some(Entrance::SkipTeardown);
+    }
+    let nodes = get_array_of_closest(origin, &goals, ENTRANCE_CANDIDATES);
     let first = *nodes.first()?;
-    let mut desired = vec![first];
-    // Retail measures these from the zombie, not from the desired origin.
+    let mut entrance_nodes = vec![first];
     let mut prev_dist = distance(origin, first);
     for node in &nodes[1..] {
         let dist = distance(origin, *node);
@@ -90,13 +148,17 @@ pub fn pick_entrance(level: &mut Level, spawner: u32, origin: [f32; 3]) -> Optio
             break;
         }
         prev_dist = dist;
-        desired.push(*node);
+        entrance_nodes.push(*node);
     }
-    if desired.len() > 1 {
-        let pick = level.random_int(desired.len() as i32) as usize;
-        return Some(desired[pick]);
-    }
-    Some(first)
+    let node = if entrance_nodes.len() > 1 {
+        entrance_nodes[level.random_int(entrance_nodes.len() as i32) as usize]
+    } else {
+        first
+    };
+    Some(Entrance::Picked {
+        node,
+        entrance_nodes,
+    })
 }
 
 /// `maps\_zombiemode_utility.gsc::get_closest_valid_player`: the nearest
@@ -125,9 +187,17 @@ impl Thread<Level> for ZombieThink {
         };
         let (spawner, origin) = (zombie.spawner, zombie.motor.origin);
         match pick_entrance(level, spawner, origin) {
-            Some(node) => cx.thread(owner, ZombieGotoEntrance::new(node)),
-            None => {
-                // A map with no windows: hunt at once.
+            Some(Entrance::Forced(node)) => cx.thread(owner, ZombieGotoEntrance::new(node)),
+            Some(Entrance::Picked {
+                node,
+                entrance_nodes,
+            }) => {
+                cx.thread(owner, ZombieAssureNode::new(entrance_nodes));
+                cx.thread(owner, ZombieGotoEntrance::new(node));
+            }
+            // `should_skip_teardown`, or a map with no windows (retail
+            // asserts): hunt at once.
+            Some(Entrance::SkipTeardown) | None => {
                 zombie_setup_attack_properties(level, actor);
                 cx.thread(owner, FindFlesh::default());
             }
@@ -171,6 +241,166 @@ impl Thread<Level> for ZombieGotoEntrance {
         // and ZMB-036.
         zombie_setup_attack_properties(cx.world, actor);
         cx.thread(owner, FindFlesh::default());
+        Yield::Done
+    }
+}
+
+/// `maps\_zombiemode_spawner.gsc::zombie_assure_node`: while the zombie has
+/// not reached its window, each `bad_path` sends it to the next of its
+/// entrance nodes, then to the 20 windows closest to where it stands.
+#[derive(Clone, Debug)]
+pub struct ZombieAssureNode {
+    entrance_nodes: Vec<[f32; 3]>,
+    next: usize,
+    widened: bool,
+    bad_path: ZombieBadPath,
+    pc: u8,
+}
+
+impl ZombieAssureNode {
+    pub fn new(entrance_nodes: Vec<[f32; 3]>) -> Self {
+        Self {
+            entrance_nodes,
+            next: 0,
+            widened: false,
+            bad_path: ZombieBadPath::default(),
+            pc: 0,
+        }
+    }
+}
+
+impl Thread<Level> for ZombieAssureNode {
+    fn resume(&mut self, cx: &mut Cx<'_, Level>) -> Yield {
+        let owner = cx.owner();
+        let actor = actor_number(owner);
+        loop {
+            match self.pc {
+                0 => {
+                    cx.endon(owner, DEATH);
+                    cx.endon(owner, GOAL);
+                    cx.endon(Owner::LEVEL, INTERMISSION);
+                    self.pc = 1;
+                }
+                1 => {
+                    let Some(&node) = self.entrance_nodes.get(self.next) else {
+                        if self.widened {
+                            self.pc = 3;
+                            return Yield::wait_seconds(ASSURE_NODE_GIVE_UP);
+                        }
+                        self.pc = 2;
+                        return Yield::wait_seconds(ASSURE_NODE_RETRY_WAIT);
+                    };
+                    if let Some(wait) = call(&mut self.bad_path, cx) {
+                        return wait;
+                    }
+                    self.bad_path = ZombieBadPath::default();
+                    let bad = cx
+                        .world
+                        .zombies
+                        .get(&actor)
+                        .and_then(|zombie| zombie.zombie_bad_path);
+                    if bad != Some(true) {
+                        return Yield::Done;
+                    }
+                    // `self SetGoalPos( node )`: `goalradius` is still the
+                    // one `zombie_goto_entrance` set.
+                    set_goal_pos(cx.world, actor, node, ENTRANCE_GOAL_RADIUS);
+                    self.next += 1;
+                }
+                2 => {
+                    let level = &*cx.world;
+                    let Some(origin) = level.zombies.get(&actor).map(|z| z.motor.origin) else {
+                        return Yield::Done;
+                    };
+                    self.entrance_nodes =
+                        get_array_of_closest(origin, &exterior_goals(level), ASSURE_NODE_CLOSEST);
+                    self.next = 0;
+                    self.widened = true;
+                    self.pc = 1;
+                }
+                _ => {
+                    // `self DoDamage( self.health + 10, self.origin )` and
+                    // `level.zombies_timeout_spawn++` wait for zombie death
+                    // (ZMB-041): the zombie stays where it is.
+                    return Yield::Done;
+                }
+            }
+        }
+    }
+}
+
+/// `maps\_zombiemode_spawner.gsc::zombie_bad_path`, called in the caller's
+/// thread: waits for a `bad_path` or its timeout and leaves the answer in
+/// `self.zombie_bad_path`.
+#[derive(Clone, Debug, Default)]
+pub struct ZombieBadPath {
+    started: bool,
+}
+
+impl Thread<Level> for ZombieBadPath {
+    fn resume(&mut self, cx: &mut Cx<'_, Level>) -> Yield {
+        let owner = cx.owner();
+        let actor = actor_number(owner);
+        if !std::mem::replace(&mut self.started, true) {
+            cx.endon(owner, DEATH);
+            cx.endon(owner, GOAL);
+            cx.thread(owner, ZombieBadPathNotify::default());
+            cx.thread(owner, ZombieBadPathTimeout::default());
+            if let Some(zombie) = cx.world.zombies.get_mut(&actor) {
+                zombie.zombie_bad_path = None;
+            }
+        }
+        let answered = cx
+            .world
+            .zombies
+            .get(&actor)
+            .is_none_or(|zombie| zombie.zombie_bad_path.is_some());
+        if !answered {
+            return Yield::wait_seconds(ZOMBIE_BAD_PATH_POLL);
+        }
+        cx.notify(owner, STOP_ZOMBIE_BAD_PATH, Vec::new());
+        Yield::Done
+    }
+}
+
+/// `zombie_bad_path_notify`: a `bad_path` answers yes.
+#[derive(Clone, Debug, Default)]
+struct ZombieBadPathNotify {
+    started: bool,
+}
+
+impl Thread<Level> for ZombieBadPathNotify {
+    fn resume(&mut self, cx: &mut Cx<'_, Level>) -> Yield {
+        let owner = cx.owner();
+        if !std::mem::replace(&mut self.started, true) {
+            cx.endon(owner, DEATH);
+            cx.endon(owner, STOP_ZOMBIE_BAD_PATH);
+            return Yield::waittill(owner, BAD_PATH);
+        }
+        if let Some(zombie) = cx.world.zombies.get_mut(&actor_number(owner)) {
+            zombie.zombie_bad_path = Some(true);
+        }
+        Yield::Done
+    }
+}
+
+/// `zombie_bad_path_timeout`: two seconds with no `bad_path` answer no.
+#[derive(Clone, Debug, Default)]
+struct ZombieBadPathTimeout {
+    started: bool,
+}
+
+impl Thread<Level> for ZombieBadPathTimeout {
+    fn resume(&mut self, cx: &mut Cx<'_, Level>) -> Yield {
+        let owner = cx.owner();
+        if !std::mem::replace(&mut self.started, true) {
+            cx.endon(owner, DEATH);
+            cx.endon(owner, STOP_ZOMBIE_BAD_PATH);
+            return Yield::wait_seconds(ZOMBIE_BAD_PATH_TIMEOUT);
+        }
+        if let Some(zombie) = cx.world.zombies.get_mut(&actor_number(owner)) {
+            zombie.zombie_bad_path = Some(false);
+        }
         Yield::Done
     }
 }

@@ -69,6 +69,9 @@ pub struct Zombie {
     pub melee_attack_dist: f32,
     /// In `MeleeCombat`.
     pub meleeing: bool,
+    /// `self.zombie_bad_path`: what the last `zombie_bad_path()` saw, a
+    /// `bad_path` (true) or its timeout (false); `None` while it waits.
+    pub zombie_bad_path: Option<bool>,
 }
 
 #[derive(Clone, Debug, Default)]
