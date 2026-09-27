@@ -9,9 +9,10 @@
 //! interest, and the ignore list that splits a crowd between players.
 
 use gsc_threads::{Cx, Owner, Thread, Yield, call};
+use sim::ClientId;
 
 use crate::Level;
-use crate::actor::{self, BAD_PATH, DEATH, GOAL, Orient, actor_owner};
+use crate::actor::{self, BAD_PATH, DEATH, GOAL, Orient, actor_number};
 use crate::mapents::{SCRIPT_STRING, TARGET, TARGETNAME};
 use crate::zombiemode::INTERMISSION;
 
@@ -87,19 +88,6 @@ pub const FOLLOW_ENEMY_TIERS: [FollowTier; 3] = [
         spread: 0.5,
     },
 ];
-
-/// The actor number of a zombie's script owner.
-pub fn actor_number(owner: Owner) -> u32 {
-    (owner.0 - actor_owner(0).0) as u32
-}
-
-/// `self SetGoalPos( goal )` with `self.goalradius = radius`.
-fn set_goal_pos(level: &mut Level, actor: u32, goal: [f32; 3], radius: f32) {
-    let graph = std::sync::Arc::clone(&level.path_graph);
-    if let Some(zombie) = level.zombies.get_mut(&actor) {
-        zombie.motor.set_goal_pos(&graph, goal, radius);
-    }
-}
 
 /// `maps\_zombiemode_spawner.gsc::get_desired_origin`: the origin of the
 /// entity, struct or node the spawner targets.
@@ -194,7 +182,7 @@ pub fn pick_entrance(level: &mut Level, spawner: u32, origin: [f32; 3]) -> Optio
 
 /// `maps\_zombiemode_utility.gsc::get_closest_valid_player`: the nearest
 /// living player (the ignore list is not ported).
-pub fn get_closest_valid_player(level: &Level, origin: [f32; 3]) -> Option<i32> {
+pub fn get_closest_valid_player(level: &Level, origin: [f32; 3]) -> Option<ClientId> {
     level
         .players
         .iter()
@@ -203,7 +191,7 @@ pub fn get_closest_valid_player(level: &Level, origin: [f32; 3]) -> Option<i32> 
             math_iw4::vec3_distance(origin, a.origin)
                 .total_cmp(&math_iw4::vec3_distance(origin, b.origin))
         })
-        .map(|player| player.entnum)
+        .map(|player| player.client)
 }
 
 /// `maps\_zombiemode_spawner.gsc::zombie_think`, for a zombie that neither
@@ -240,10 +228,10 @@ impl Thread<Level> for ZombieThink {
     }
 }
 
-/// `maps\_zombiemode_spawner.gsc::zombie_setup_attack_properties`.
-pub fn zombie_setup_attack_properties(level: &mut Level, actor: u32) {
+/// `self zombie_setup_attack_properties()`.
+fn zombie_setup_attack_properties(level: &mut Level, actor: u32) {
     if let Some(zombie) = level.zombies.get_mut(&actor) {
-        zombie.melee_attack_dist = MELEE_ATTACK_DIST;
+        zombie.setup_attack_properties();
     }
 }
 
@@ -268,7 +256,8 @@ impl Thread<Level> for ZombieGotoEntrance {
             self.pc = 1;
             cx.endon(owner, DEATH);
             cx.endon(Owner::LEVEL, INTERMISSION);
-            set_goal_pos(cx.world, actor, self.node, ENTRANCE_GOAL_RADIUS);
+            cx.world
+                .set_goal_pos(actor, self.node, ENTRANCE_GOAL_RADIUS);
             return Yield::waittill(owner, GOAL);
         }
         // `tear_into_building()` and the window traversal come with ZMB-037
@@ -338,7 +327,7 @@ impl Thread<Level> for ZombieAssureNode {
                     }
                     // `self SetGoalPos( node )`: `goalradius` is still the
                     // one `zombie_goto_entrance` set.
-                    set_goal_pos(cx.world, actor, node, ENTRANCE_GOAL_RADIUS);
+                    cx.world.set_goal_pos(actor, node, ENTRANCE_GOAL_RADIUS);
                     self.next += 1;
                 }
                 2 => {
@@ -515,16 +504,18 @@ impl Thread<Level> for ZombieFollowEnemy {
         let origin = zombie.motor.origin;
         let enemy = zombie
             .favorite_enemy
-            .and_then(|entnum| level.player(entnum))
+            .and_then(|client| level.player(client))
             .map(|player| player.origin);
         let mut extra_wait = 0.0;
         if let Some(enemy) = enemy {
+            // `self OrientMode( "face default" )`, unless a swing faces the
+            // enemy.
             if let Some(zombie) = level.zombies.get_mut(&actor)
                 && !zombie.meleeing
             {
                 zombie.motor.orient = Orient::Motion;
             }
-            set_goal_pos(level, actor, enemy, FIND_FLESH_GOAL_RADIUS);
+            level.set_goal_pos(actor, enemy, FIND_FLESH_GOAL_RADIUS);
             let dist = math_iw4::vec3_distance(origin, enemy);
             if let Some(tier) = FOLLOW_ENEMY_TIERS.iter().find(|tier| dist > tier.beyond) {
                 extra_wait = tier.base + level.random_float_range(0.0, tier.spread);

@@ -7,9 +7,10 @@
 //! its distance test only (no facing test, no one-melee-per-target rule).
 
 use gsc_threads::{Cx, Thread, Value, Yield, call};
+use sim::ClientId;
 
 use crate::Level;
-use crate::actor::{AnimMode, DEATH, Orient};
+use crate::actor::{AnimMode, DEATH, Orient, actor_number};
 use crate::level::EngineCommand;
 
 /// `self waittill( "meleeanim", note )`: a note of the swing clip.
@@ -25,21 +26,40 @@ pub const NOTE_STOP: &str = "stop";
 /// The dvar default, not read from the zone.
 pub const AI_MELEE_RANGE: f32 = 64.0;
 
-/// The zombie's origin and its living enemy's, when it has one.
-fn zombie_and_enemy(level: &Level, actor: u32) -> Option<([f32; 3], i32, [f32; 3])> {
-    let zombie = level.zombies.get(&actor)?;
-    let entnum = zombie.favorite_enemy?;
-    let player = level.player(entnum).filter(|player| player.alive)?;
-    Some((zombie.motor.origin, entnum, player.origin))
+/// A zombie and its living enemy.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Engagement {
+    origin: [f32; 3],
+    enemy: ClientId,
+    enemy_origin: [f32; 3],
+    melee_attack_dist: f32,
+}
+
+impl Engagement {
+    fn of(level: &Level, actor: u32) -> Option<Self> {
+        let zombie = level.zombies.get(&actor)?;
+        let enemy = zombie.favorite_enemy?;
+        let player = level.player(enemy).filter(|player| player.alive)?;
+        Some(Self {
+            origin: zombie.motor.origin,
+            enemy,
+            enemy_origin: player.origin,
+            melee_attack_dist: zombie.melee_attack_dist,
+        })
+    }
+
+    fn distance(&self) -> f32 {
+        math_iw4::vec3_distance(self.origin, self.enemy_origin)
+    }
+
+    /// Close enough to start or keep swinging (`meleeAttackDist`).
+    fn in_reach(&self) -> bool {
+        self.distance() <= self.melee_attack_dist
+    }
 }
 
 fn in_melee_range(level: &Level, actor: u32) -> bool {
-    let Some(zombie) = level.zombies.get(&actor) else {
-        return false;
-    };
-    zombie_and_enemy(level, actor).is_some_and(|(origin, _, enemy)| {
-        math_iw4::vec3_distance(origin, enemy) <= zombie.melee_attack_dist
-    })
+    Engagement::of(level, actor).is_some_and(|engagement| engagement.in_reach())
 }
 
 /// Every server frame: an enemy within `meleeAttackDist` starts
@@ -56,7 +76,7 @@ impl Thread<Level> for CombatWatch {
             self.started = true;
             cx.endon(owner, DEATH);
         }
-        let actor = crate::spawner::actor_number(owner);
+        let actor = actor_number(owner);
         let level = &mut *cx.world;
         let idle = level
             .zombies
@@ -101,11 +121,7 @@ pub struct MeleeCombat {
 impl MeleeCombat {
     fn finish(level: &mut Level, actor: u32) {
         if let Some(zombie) = level.zombies.get_mut(&actor) {
-            zombie.meleeing = false;
-            zombie.motor.stop_scripted();
-            zombie.motor.anim_mode = AnimMode::Walk;
-            // `self OrientMode( "face default" )`.
-            zombie.motor.orient = Orient::Motion;
+            zombie.end_melee();
         }
     }
 }
@@ -113,7 +129,7 @@ impl MeleeCombat {
 impl Thread<Level> for MeleeCombat {
     fn resume(&mut self, cx: &mut Cx<'_, Level>) -> Yield {
         let owner = cx.owner();
-        let actor = crate::spawner::actor_number(owner);
+        let actor = actor_number(owner);
         loop {
             match self.pc {
                 0 => {
@@ -122,8 +138,8 @@ impl Thread<Level> for MeleeCombat {
                         cx.endon(owner, DEATH);
                     }
                     let level = &mut *cx.world;
-                    let (Some((origin, _, enemy)), Some(speed)) = (
-                        zombie_and_enemy(level, actor),
+                    let (Some(engagement), Some(speed)) = (
+                        Engagement::of(level, actor),
                         level.zombies.get(&actor).map(|zombie| zombie.move_speed),
                     ) else {
                         Self::finish(level, actor);
@@ -135,10 +151,9 @@ impl Thread<Level> for MeleeCombat {
                         // `OrientMode( "face angle", VectorToAngles(
                         // enemy - self )[1] )`.
                         zombie.motor.anim_mode = AnimMode::InPlace;
-                        zombie.motor.orient = Orient::Angle(math_iw4::vec_to_yaw(
-                            enemy[0] - origin[0],
-                            enemy[1] - origin[1],
-                        ));
+                        let (from, to) = (engagement.origin, engagement.enemy_origin);
+                        zombie.motor.orient =
+                            Orient::Angle(math_iw4::vec_to_yaw(to[0] - from[0], to[1] - from[1]));
                         zombie.motor.play_scripted(clip);
                     }
                     self.pc = 1;
@@ -153,11 +168,11 @@ impl Thread<Level> for MeleeCombat {
                     // Each `break` of the note loop: the end, a hit with no
                     // enemy left, or `stop` when `CanContinueToMelee()` fails
                     // (stood in for by the reach test).
-                    let enemy = zombie_and_enemy(level, actor);
+                    let engagement = Engagement::of(level, actor);
                     let leave = match note.as_str() {
                         NOTE_END => true,
-                        NOTE_FIRE => enemy.is_none(),
-                        NOTE_STOP => !in_melee_range(level, actor),
+                        NOTE_FIRE => engagement.is_none(),
+                        NOTE_STOP => !engagement.is_some_and(|e| e.in_reach()),
                         _ => false,
                     };
                     if leave {
@@ -165,17 +180,17 @@ impl Thread<Level> for MeleeCombat {
                         continue;
                     }
                     if note == NOTE_FIRE
-                        && let Some((origin, entnum, enemy)) = enemy
-                        && math_iw4::vec3_distance(origin, enemy) <= AI_MELEE_RANGE
+                        && let Some(engagement) = engagement
+                        && engagement.distance() <= AI_MELEE_RANGE
                     {
                         let amount = level
                             .zombies
                             .get(&actor)
                             .map_or(0, |zombie| zombie.melee_damage);
                         level.commands.push(EngineCommand::MeleePlayer {
-                            entnum,
+                            client: engagement.enemy,
                             amount,
-                            from: origin,
+                            from: engagement.origin,
                         });
                     }
                     return Yield::waittill(owner, MELEEANIM);

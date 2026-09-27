@@ -127,7 +127,7 @@ pub fn spawn_zombie(level: &mut crate::Level, spawner: u32) -> Option<u32> {
             health: level.zombie_health,
             body,
             head,
-            motor: crate::actor::Motor::new(origin, yaw, move_clip, crate::anims::IDLE),
+            motor: crate::actor::Motor::new(origin, yaw, move_clip),
             move_speed,
             favorite_enemy: None,
             melee_damage: ZOMBIE_MELEE_DAMAGE,

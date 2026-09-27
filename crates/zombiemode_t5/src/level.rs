@@ -10,7 +10,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use sim::ScriptPlayer;
+use sim::{ClientId, ScriptPlayer};
 
 use crate::mapents::MapEnts;
 use crate::table::StringTables;
@@ -43,7 +43,7 @@ pub enum EngineCommand {
     /// `player DoDamage( amount, origin, zombie, 0, "MOD_MELEE" )` from the
     /// engine's `melee()`.
     MeleePlayer {
-        entnum: i32,
+        client: ClientId,
         amount: i32,
         from: [f32; 3],
     },
@@ -61,8 +61,8 @@ pub struct Zombie {
     pub motor: crate::actor::Motor,
     /// `self.zombie_move_speed`.
     pub move_speed: crate::anims::MoveSpeed,
-    /// `self.favoriteenemy`: a player's entity number.
-    pub favorite_enemy: Option<i32>,
+    /// `self.favoriteenemy`.
+    pub favorite_enemy: Option<ClientId>,
     /// `self.meleeDamage`.
     pub melee_damage: i32,
     /// `self.meleeAttackDist`, set by `zombie_setup_attack_properties`.
@@ -72,6 +72,22 @@ pub struct Zombie {
     /// `self.zombie_bad_path`: what the last `zombie_bad_path()` saw, a
     /// `bad_path` (true) or its timeout (false); `None` while it waits.
     pub zombie_bad_path: Option<bool>,
+}
+
+impl Zombie {
+    /// `maps\_zombiemode_spawner.gsc::zombie_setup_attack_properties`.
+    pub fn setup_attack_properties(&mut self) {
+        self.melee_attack_dist = crate::spawner::MELEE_ATTACK_DIST;
+    }
+
+    /// The end of `MeleeCombat`: back to walking, facing where it goes
+    /// (`self OrientMode( "face default" )`).
+    pub fn end_melee(&mut self) {
+        self.meleeing = false;
+        self.motor.stop_scripted();
+        self.motor.anim_mode = crate::actor::AnimMode::Walk;
+        self.motor.orient = crate::actor::Orient::Motion;
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -170,9 +186,17 @@ impl Level {
         min + (max - min) * unit
     }
 
-    /// A player from this frame's `GetPlayers()` by entity number.
-    pub fn player(&self, entnum: i32) -> Option<&ScriptPlayer> {
-        self.players.iter().find(|player| player.entnum == entnum)
+    /// A player from this frame's `GetPlayers()`.
+    pub fn player(&self, client: ClientId) -> Option<&ScriptPlayer> {
+        self.players.iter().find(|player| player.client == client)
+    }
+
+    /// `self.goalradius = radius; self SetGoalPos( goal )` on zombie `actor`.
+    pub fn set_goal_pos(&mut self, actor: u32, goal: [f32; 3], radius: f32) {
+        let graph = Arc::clone(&self.path_graph);
+        if let Some(zombie) = self.zombies.get_mut(&actor) {
+            zombie.motor.set_goal_pos(&graph, goal, radius);
+        }
     }
 
     /// `get_enemy_count()`: zombies alive.

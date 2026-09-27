@@ -70,25 +70,13 @@ impl ZombiesMode {
             engine.set_actor_origin(actor, zombie.motor.origin, zombie.motor.yaw);
             let owner = actor_owner(actor);
             for event in events {
-                match event {
-                    MotorEvent::Goal => {
-                        self.threads.notify(owner, actor::GOAL, Vec::new());
-                    }
-                    MotorEvent::BadPath => {
-                        self.threads.notify(owner, actor::BAD_PATH, Vec::new());
-                    }
-                    MotorEvent::Note(note) => {
-                        self.threads.notify(
-                            owner,
-                            MELEEANIM,
-                            vec![Value::Str(note.as_str().into())],
-                        );
-                    }
-                    MotorEvent::End => {
-                        self.threads
-                            .notify(owner, MELEEANIM, vec![Value::Str(NOTE_END.into())]);
-                    }
-                }
+                let (name, args) = match event {
+                    MotorEvent::Goal => (actor::GOAL, Vec::new()),
+                    MotorEvent::BadPath => (actor::BAD_PATH, Vec::new()),
+                    MotorEvent::Note(note) => (MELEEANIM, vec![Value::Str(note.into())]),
+                    MotorEvent::End => (MELEEANIM, vec![Value::Str(NOTE_END.into())]),
+                };
+                self.threads.notify(owner, name, args);
             }
         }
     }
@@ -157,11 +145,11 @@ impl ModeScript for ZombiesMode {
                     }
                 }
                 EngineCommand::MeleePlayer {
-                    entnum,
+                    client,
                     amount,
                     from,
                 } => {
-                    engine.melee_player(sim::ClientId(entnum as u32), amount, from);
+                    engine.melee_player(client, amount, from);
                 }
             }
         }

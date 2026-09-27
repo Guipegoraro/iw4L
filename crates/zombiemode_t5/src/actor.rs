@@ -11,6 +11,8 @@ use std::sync::Arc;
 
 use gsc_threads::Owner;
 use pathnodes::{PathGraph, Route};
+
+use crate::anims::IDLE;
 use xmodel_runtime::AnimClip;
 
 /// `self waittill( "goal" )`: within `goalradius` of the goal.
@@ -34,6 +36,11 @@ pub fn actor_owner(actor: u32) -> Owner {
 }
 
 const ACTOR_OWNER_BASE: u64 = 1 << 32;
+
+/// The actor number of a zombie's script owner: [`actor_owner`] undone.
+pub fn actor_number(owner: Owner) -> u32 {
+    (owner.0 - ACTOR_OWNER_BASE) as u32
+}
 
 /// `OrientMode`.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -87,9 +94,8 @@ struct Playing {
 pub struct Motor {
     pub origin: [f32; 3],
     pub yaw: f32,
-    /// The run cycle it walks with.
+    /// The run cycle it walks with; standing, it plays [`IDLE`].
     pub move_clip: &'static str,
-    pub idle_clip: &'static str,
     pub orient: Orient,
     pub anim_mode: AnimMode,
     goal: Option<Goal>,
@@ -102,17 +108,11 @@ pub struct Motor {
 impl Motor {
     /// An actor standing at `origin`, already playing `move_clip` (the spawn
     /// starts it).
-    pub fn new(
-        origin: [f32; 3],
-        yaw: f32,
-        move_clip: &'static str,
-        idle_clip: &'static str,
-    ) -> Self {
+    pub fn new(origin: [f32; 3], yaw: f32, move_clip: &'static str) -> Self {
         Self {
             origin,
             yaw,
             move_clip,
-            idle_clip,
             orient: Orient::Motion,
             anim_mode: AnimMode::Walk,
             goal: None,
@@ -149,10 +149,6 @@ impl Motor {
             radius,
             reached: false,
         });
-    }
-
-    pub fn clear_goal(&mut self) {
-        self.goal = None;
     }
 
     pub fn at_goal(&self) -> bool {
@@ -200,11 +196,7 @@ impl Motor {
     ) -> Vec<MotorEvent> {
         let mut events = std::mem::take(&mut self.pending);
         if !self.scripted {
-            let want = if self.walking() {
-                self.move_clip
-            } else {
-                self.idle_clip
-            };
+            let want = if self.walking() { self.move_clip } else { IDLE };
             if self.playing.clip != want {
                 self.play(want, true);
             }

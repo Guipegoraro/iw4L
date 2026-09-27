@@ -72,13 +72,6 @@ impl ActorClips {
     }
 }
 
-/// The leaf frequency (cycles per second) that plays `clip` at `rate` times
-/// its authored speed, as `SetAnim`'s rate does. A clip with no length stays
-/// still.
-pub fn clip_frequency(clip: &xmodel_runtime::AnimClip, rate: f32) -> f32 {
-    rate * clip.frequency()
-}
-
 /// A model attached to an actor's body, like `self Attach(head)` in GSC.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ActorAttachment {
@@ -201,6 +194,11 @@ pub(crate) fn spawn(
 }
 
 /// `AnimScripted` / `SetAnim` on one clip: restart it from the first frame.
+///
+/// Only a clip the match loaded into [`ActorClips`] plays: its length sets
+/// the playback speed, and the script's motor moves the actor by the same
+/// clip, so a clip missing there would animate one way and walk another.
+/// It returns false and the actor keeps the clip it had.
 pub(crate) fn play_anim(
     world: &mut FrameWorld<'_>,
     actor: u32,
@@ -211,7 +209,9 @@ pub(crate) fn play_anim(
     let Some(frequency) = world
         .actor_clips()
         .get(clip)
-        .map(|facts| clip_frequency(facts, rate))
+        // The leaf frequency (cycles per second) that plays the clip at `rate`
+        // times its authored speed, as `SetAnim`'s rate does.
+        .map(|facts| rate * facts.frequency())
     else {
         return false;
     };
