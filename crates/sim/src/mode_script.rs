@@ -13,6 +13,12 @@ use crate::frame::FrameWorld;
 use crate::match_state::ClientLifecycle;
 use crate::world::{ClientId, Tick};
 
+/// How far above an actor the ground trace starts: the height it may step up.
+pub const ACTOR_STEP_HEIGHT: f32 = 18.0;
+
+/// How far below an actor the ground trace looks: the drop it may step down.
+pub const ACTOR_GROUND_PROBE: f32 = 64.0;
+
 pub trait ModeScript: fmt::Debug + Send + Sync {
     fn clone_box(&self) -> Box<dyn ModeScript>;
 
@@ -155,7 +161,9 @@ impl<'a, 'w> ModeEngine<'a, 'w> {
             return;
         };
         crate::step::seed_ps_ammo_tables(ps, weapon, &facts, clip, 0, false, stock);
-        self.world.client_meta_mut(client).set_ammo(weapon, clip, stock);
+        self.world
+            .client_meta_mut(client)
+            .set_ammo(weapon, clip, stock);
     }
 
     /// `Spawner DoSpawn()` plus the character's `SetModel`/`Attach`: an actor
@@ -189,5 +197,53 @@ impl<'a, 'w> ModeEngine<'a, 'w> {
 
     pub fn has_actor_model(&self, model: &str) -> bool {
         self.world.actor_models().contains(model)
+    }
+
+    /// An installed actor animation: its length, root motion and notes.
+    pub fn actor_clip(&self, clip: &str) -> Option<std::sync::Arc<xmodel_runtime::AnimClip>> {
+        self.world.actor_clips().get(clip).cloned()
+    }
+
+    /// The ground under `origin`: a point trace from a step above it to
+    /// `ACTOR_GROUND_PROBE` below. `None` when nothing is there.
+    pub fn ground_z(&self, origin: [f32; 3]) -> Option<f32> {
+        let start = [origin[0], origin[1], origin[2] + ACTOR_STEP_HEIGHT];
+        let end = [origin[0], origin[1], origin[2] - ACTOR_GROUND_PROBE];
+        let trace = self.world.trace_world(
+            start,
+            end,
+            [0.0; 3],
+            [0.0; 3],
+            crate::bullet_collision::MASK_PLAYER_SOLID,
+        );
+        (trace.fraction < 1.0 && trace.startsolid == 0)
+            .then(|| start[2] + (end[2] - start[2]) * trace.fraction)
+    }
+
+    /// `player DoDamage( amount, origin, attacker, 0, "MOD_MELEE" )` from an
+    /// actor at `from`: the host's melee damage on the player. An actor is not
+    /// a client, so the player is its own attacker, as world damage is.
+    pub fn melee_player(&mut self, client: ClientId, amount: i32, from: [f32; 3]) -> bool {
+        let Some(meta) = self.world.client_meta(client) else {
+            return false;
+        };
+        let life = meta.life_sequence;
+        let attempt = crate::DamageAttempt {
+            source: crate::DamageSource::Melee,
+            pellet: crate::PelletId(0),
+            attacker: client,
+            attacker_life: life,
+            target: client,
+            target_life: life,
+            weapon: 0,
+            amount,
+            killcam_entity_start_time: 0,
+            inflictor_origin: Some(from),
+            hitloc: 0,
+        };
+        !matches!(
+            crate::damage::apply_damage_attempt(self.world, self.tick, &attempt),
+            crate::damage::DamageOutcome::Refused(_)
+        )
     }
 }

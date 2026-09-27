@@ -49,6 +49,36 @@ impl ActorModels {
     }
 }
 
+/// The animations actors play, installed with the map: name → the decoded
+/// clip, whose length, root motion and notes the mode script reads.
+#[derive(Clone, Debug, Default)]
+pub struct ActorClips(BTreeMap<String, Arc<xmodel_runtime::AnimClip>>);
+
+impl ActorClips {
+    pub fn new(clips: impl IntoIterator<Item = (String, Arc<xmodel_runtime::AnimClip>)>) -> Self {
+        Self(clips.into_iter().collect())
+    }
+
+    pub fn get(&self, name: &str) -> Option<&Arc<xmodel_runtime::AnimClip>> {
+        self.0.get(name)
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
+/// The leaf frequency (cycles per second) that plays `clip` at `rate` times
+/// its authored speed, as `SetAnim`'s rate does. A clip with no length stays
+/// still.
+pub fn clip_frequency(clip: &xmodel_runtime::AnimClip, rate: f32) -> f32 {
+    rate * clip.frequency()
+}
+
 /// A model attached to an actor's body, like `self Attach(head)` in GSC.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ActorAttachment {
@@ -178,13 +208,20 @@ pub(crate) fn play_anim(
     looping: bool,
     rate: f32,
 ) -> bool {
+    let Some(frequency) = world
+        .actor_clips()
+        .get(clip)
+        .map(|facts| clip_frequency(facts, rate))
+    else {
+        return false;
+    };
     let Some(dobj) = capabilities_mut(world, actor_model_id(actor)).and_then(|c| c.dobj.as_mut())
     else {
         return false;
     };
     // The attached models survive a new clip: only the tree is replaced.
     let composition = dobj.semantic_state.composition.clone();
-    dobj.begin_script_model_play_anim(clip, looping, rate);
+    dobj.begin_script_model_play_anim(clip, looping, frequency);
     dobj.semantic_state.composition = composition;
     true
 }

@@ -653,6 +653,15 @@ pub fn apply_prepared_match(
             let events = map_event_items(&parsed.events, tree, &xanims.0);
             content.set_player_anim_script(Some(sim::PlayerAnimScript::from_tables(slots, events)));
         }
+        // The clips zombie actors play; none on maps that lack them.
+        let actor_clips = sim::actors::ActorClips::new(
+            zombiemode_t5::actor_clips().into_iter().filter_map(|name| {
+                xanims
+                    .0
+                    .clip(assets::AssetNamespace::T5, name)
+                    .map(|clip| (name.to_owned(), clip))
+            }),
+        );
         stage_resource(&mut install, xanims);
         stage_resource(&mut install, death);
         stage_resource(&mut install, player_anim_sources);
@@ -683,6 +692,15 @@ pub fn apply_prepared_match(
             &map_use_triggers,
             &flag_descriptors,
         )?;
+        if !actor_clips.is_empty() {
+            diag::info!(
+                Sim,
+                "zombies: {} of {} actor clips ready",
+                actor_clips.len(),
+                zombiemode_t5::actor_clips().len()
+            );
+        }
+        sim.install_actor_clips(actor_clips);
         sim.install_mode_script((kind == gamemode_iw4::GameModeKind::Zombies).then(|| {
             let tables = zombiemode_t5::StringTables::from_csv(
                 facts

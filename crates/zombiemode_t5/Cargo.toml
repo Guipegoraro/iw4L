@@ -8,8 +8,10 @@ description = "Black Ops zombies rules, ported from the retail GSC one module pe
 [dependencies]
 diag.workspace = true
 gsc_threads.workspace = true
+math_iw4.workspace = true
 pathnodes.workspace = true
 sim.workspace = true
+xmodel_runtime.workspace = true
 
 [lints]
 workspace = true

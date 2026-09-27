@@ -568,6 +568,8 @@ pub struct SimState {
     mode_script: crate::mode_script::ModeScriptSlot,
 
     actor_models: crate::actors::ActorModels,
+
+    actor_clips: crate::actors::ActorClips,
 }
 
 impl Default for SimState {
@@ -690,6 +692,7 @@ impl Default for SimState {
             publish_snapshot: true,
             mode_script: crate::mode_script::ModeScriptSlot::default(),
             actor_models: crate::actors::ActorModels::default(),
+            actor_clips: crate::actors::ActorClips::default(),
         };
         world.recompute_content_digest();
         world
@@ -738,6 +741,14 @@ impl SimState {
 
     pub fn actor_models(&self) -> &crate::actors::ActorModels {
         &self.actor_models
+    }
+
+    pub fn install_actor_clips(&mut self, clips: crate::actors::ActorClips) {
+        self.actor_clips = clips;
+    }
+
+    pub fn actor_clips(&self) -> &crate::actors::ActorClips {
+        &self.actor_clips
     }
 
     /// Actors come and go at runtime, so the rows are a list, kept sorted by

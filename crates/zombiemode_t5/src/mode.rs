@@ -1,10 +1,12 @@
 //! The zombies mode as the simulation runs it: one [`Scheduler`] of ported
 //! threads over the [`Level`], stepped once per server frame.
 
-use gsc_threads::{Owner, Scheduler};
+use gsc_threads::{Owner, Scheduler, Value};
 use sim::{ModeEngine, ModeScript};
 
+use crate::actor::{self, MotorEvent, actor_owner};
 use crate::level::EngineCommand;
+use crate::zombie_melee::{MELEEANIM, NOTE_END};
 use crate::zombiemode::{ALL_PLAYERS_CONNECTED, Main};
 use crate::{Level, MapEnts, StringTables};
 
@@ -12,6 +14,8 @@ use crate::{Level, MapEnts, StringTables};
 pub struct ZombiesMode {
     threads: Scheduler<Level>,
     level: Level,
+    /// `GetTime()` of the previous frame, for the actors' frame time.
+    last_ms: Option<u64>,
 }
 
 impl ZombiesMode {
@@ -42,11 +46,50 @@ impl ZombiesMode {
         Self {
             threads,
             level: Level::new(map, tables, path_graph, ents),
+            last_ms: None,
         }
     }
 
     pub fn level(&self) -> &Level {
         &self.level
+    }
+
+    /// The engine's actor pass: each zombie's motor moves it by root motion,
+    /// its pose goes to the engine, and what it reports wakes its threads next
+    /// frame.
+    fn step_actors(&mut self, engine: &mut ModeEngine<'_, '_>, dt: f32) {
+        for (&actor, zombie) in &mut self.level.zombies {
+            let clip = engine.actor_clip(zombie.motor.clip());
+            let events = zombie
+                .motor
+                .step(dt, clip.as_deref(), |point| engine.ground_z(point));
+            if let Some((clip, looping)) = zombie.motor.take_restart() {
+                engine.actor_play_anim(actor, clip, looping, 1.0);
+            }
+            engine.set_actor_origin(actor, zombie.motor.origin, zombie.motor.yaw);
+            let owner = actor_owner(actor);
+            for event in events {
+                match event {
+                    MotorEvent::Goal => {
+                        self.threads.notify(owner, actor::GOAL, Vec::new());
+                    }
+                    MotorEvent::BadPath => {
+                        self.threads.notify(owner, actor::BAD_PATH, Vec::new());
+                    }
+                    MotorEvent::Note(note) => {
+                        self.threads.notify(
+                            owner,
+                            MELEEANIM,
+                            vec![Value::Str(note.as_str().into())],
+                        );
+                    }
+                    MotorEvent::End => {
+                        self.threads
+                            .notify(owner, MELEEANIM, vec![Value::Str(NOTE_END.into())]);
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -96,6 +139,10 @@ impl ModeScript for ZombiesMode {
                     match engine.spawn_actor(actor, body, &[head], origin, yaw) {
                         Ok(_) => {
                             engine.actor_play_anim(actor, anim, true, 1.0);
+                            // `spawner add_spawn_function( zombie_spawn_init )`
+                            // ends in `self thread zombie_think()`.
+                            self.threads
+                                .spawn(actor_owner(actor), crate::spawner::ZombieThink);
                         }
                         Err(error) => {
                             // Retail's `spawn_failed`: the zombie never was.
@@ -108,8 +155,20 @@ impl ModeScript for ZombiesMode {
                         }
                     }
                 }
+                EngineCommand::MeleePlayer {
+                    entnum,
+                    amount,
+                    from,
+                } => {
+                    engine.melee_player(sim::ClientId(entnum as u32), amount, from);
+                }
             }
         }
+        let dt = self.last_ms.map_or(0.0, |last| {
+            self.level.now_ms.saturating_sub(last) as f32 / 1000.0
+        });
+        self.last_ms = Some(self.level.now_ms);
+        self.step_actors(engine, dt);
         for line in self.level.println.drain(..) {
             diag::info!(Sim, "zombies: {line}");
         }

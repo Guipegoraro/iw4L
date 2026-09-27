@@ -127,10 +127,15 @@ Changes on top of upstream, newest last. Every change is recorded here.
   Rounds now spawn zombies on Nacht: the zone manager picks the spawners of
   the start zone, and each zombie wears a body and head picked from the
   map's character script (the same bodies and heads the original draws).
-  For now they stand at their spawners playing the walk cycle: they
-  do not move, attack or take damage yet, and their heads draw dark (the
-  character skin shader is not loaded yet). Zombies are server entities, so
-  co-op players see the same ones.
+  Each zombie walks, runs or sprints (the original roll on the round's move
+  speed) to one of the windows near its spawner, then hunts the closest
+  player and swings at them when within reach, as the original
+  `_zombiemode_spawner.gsc` and `zombie_melee.gsc` do. It moves by the
+  animation's own root motion along the map's path nodes and stays on the
+  ground. Boards are not torn off and windows are not climbed yet: a zombie
+  at its window walks straight through it. They do not take damage yet, and
+  their heads draw dark (the character skin shader is not loaded yet).
+  Zombies are server entities, so co-op players see the same ones.
   World surfaces with Black Ops terrain-scorch techniques (`*_sco`, most of
   Nacht's walls and floors) draw with their real materials, never scorched:
   IW4L has no scorch system, so the runtime scorch vertex stream is left

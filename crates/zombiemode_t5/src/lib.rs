@@ -10,6 +10,8 @@
 
 #![forbid(unsafe_code)]
 
+pub mod actor;
+pub mod anims;
 pub mod character;
 pub mod level;
 pub mod loadout;
@@ -18,11 +20,14 @@ pub mod mode;
 pub mod powerups;
 pub mod prototype;
 pub mod score;
+pub mod spawner;
 pub mod table;
 pub mod utility;
+pub mod zombie_melee;
 pub mod zombiemode;
 pub mod zone_manager;
 
+pub use anims::actor_clips;
 pub use character::actor_models;
 pub use level::Level;
 pub use loadout::{StartLoadout, start_loadout};

@@ -40,6 +40,13 @@ pub enum EngineCommand {
         yaw: f32,
         anim: &'static str,
     },
+    /// `player DoDamage( amount, origin, zombie, 0, "MOD_MELEE" )` from the
+    /// engine's `melee()`.
+    MeleePlayer {
+        entnum: i32,
+        amount: i32,
+        from: [f32; 3],
+    },
 }
 
 /// A zombie the script spawned, keyed by its actor number.
@@ -50,6 +57,18 @@ pub struct Zombie {
     pub health: i32,
     pub body: &'static str,
     pub head: &'static str,
+    /// Where it is and what it walks to: the engine half of the actor.
+    pub motor: crate::actor::Motor,
+    /// `self.zombie_move_speed`.
+    pub move_speed: crate::anims::MoveSpeed,
+    /// `self.favoriteenemy`: a player's entity number.
+    pub favorite_enemy: Option<i32>,
+    /// `self.meleeDamage`.
+    pub melee_damage: i32,
+    /// `self.meleeAttackDist`, set by `zombie_setup_attack_properties`.
+    pub melee_attack_dist: f32,
+    /// In `MeleeCombat`.
+    pub meleeing: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -138,6 +157,19 @@ impl Level {
         x ^= x >> 27;
         self.rng = x;
         (x.wrapping_mul(0x2545_f491_4f6c_dd1d) >> 33) as i32 % max
+    }
+
+    /// `RandomFloatRange( min, max )`: `min..max`, from the same sequence as
+    /// [`Level::random_int`].
+    pub fn random_float_range(&mut self, min: f32, max: f32) -> f32 {
+        const STEPS: i32 = 1 << 24;
+        let unit = self.random_int(STEPS) as f32 / STEPS as f32;
+        min + (max - min) * unit
+    }
+
+    /// A player from this frame's `GetPlayers()` by entity number.
+    pub fn player(&self, entnum: i32) -> Option<&ScriptPlayer> {
+        self.players.iter().find(|player| player.entnum == entnum)
     }
 
     /// `get_enemy_count()`: zombies alive.

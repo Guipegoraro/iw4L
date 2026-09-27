@@ -211,6 +211,7 @@ dependencies = [
  "serde_json",
  "sim",
  "trace_iw4",
+ "xmodel_runtime",
  "zombiemode_t5",
 ]
 
@@ -7691,8 +7692,10 @@ version = "0.1.0"
 dependencies = [
  "diag",
  "gsc_threads",
+ "math_iw4",
  "pathnodes",
  "sim",
+ "xmodel_runtime",
 ]
 
 [[package]]

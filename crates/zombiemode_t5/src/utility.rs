@@ -95,12 +95,13 @@ pub fn wait_network_frame() -> gsc_threads::Yield {
     gsc_threads::Yield::wait_seconds(0.1)
 }
 
-/// The first clip a spawned zombie plays.
-pub const ZOMBIE_WALK_ANIM: &str = "ai_zombie_walk_v1";
+/// `self.meleeDamage` from `maps\_zombiemode_spawner.gsc::zombie_spawn_init`.
+pub const ZOMBIE_MELEE_DAMAGE: i32 = 60;
 
 /// `maps\_zombiemode_utility.gsc::spawn_zombie`: spawns from `spawner` (an
-/// entity index) through its aitype and character. Returns the actor number;
-/// the engine spawn is queued for after the frame.
+/// entity index) through its aitype and character, with the run cycle
+/// `zombie_spawn_init` picks. Returns the actor number; the engine spawn is
+/// queued for after the frame, and the caller starts its `zombie_think`.
 pub fn spawn_zombie(level: &mut crate::Level, spawner: u32) -> Option<u32> {
     let ent = level.ents.get(spawner)?.clone();
     let Some(aitype) = crate::character::aitype_for_classname(ent.classname()) else {
@@ -111,8 +112,12 @@ pub fn spawn_zombie(level: &mut crate::Level, spawner: u32) -> Option<u32> {
         return None;
     };
     let (body, head) = crate::character::pick_models(level, &aitype.character);
+    let move_speed = crate::anims::set_run_speed(level);
+    let move_clip = crate::anims::set_zombie_run_cycle(level, move_speed);
     let actor = level.next_actor;
     level.next_actor += 1;
+    let origin = ent.origin();
+    let yaw = ent.angles()[1];
     level.zombies.insert(
         actor,
         crate::level::Zombie {
@@ -122,6 +127,12 @@ pub fn spawn_zombie(level: &mut crate::Level, spawner: u32) -> Option<u32> {
             health: level.zombie_health,
             body,
             head,
+            motor: crate::actor::Motor::new(origin, yaw, move_clip, crate::anims::IDLE),
+            move_speed,
+            favorite_enemy: None,
+            melee_damage: ZOMBIE_MELEE_DAMAGE,
+            melee_attack_dist: crate::spawner::MELEE_ATTACK_DIST,
+            meleeing: false,
         },
     );
     level
@@ -130,9 +141,9 @@ pub fn spawn_zombie(level: &mut crate::Level, spawner: u32) -> Option<u32> {
             actor,
             body,
             head,
-            origin: ent.origin(),
-            yaw: ent.angles()[1],
-            anim: ZOMBIE_WALK_ANIM,
+            origin,
+            yaw,
+            anim: move_clip,
         });
     Some(actor)
 }

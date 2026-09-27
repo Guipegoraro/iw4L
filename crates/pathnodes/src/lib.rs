@@ -10,6 +10,10 @@
 //! heuristic; equal costs are broken by node number, so a path is a pure
 //! function of the graph and its endpoints.
 
+mod route;
+
+pub use route::{ROUTE_NODE_SEARCH_RADIUS, Route, RouteStep};
+
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 
