@@ -26,6 +26,12 @@ pub const DEATH: &str = "death";
 /// Not measured against retail yet (ZMB-029).
 pub const ACTOR_TURN_RATE: f32 = 360.0;
 
+/// How often an actor with no route to its goal says `bad_path` again. Retail
+/// keeps repathing while the path fails, and each failure is a `bad_path`
+/// (`zombie_assure_node` counts on hearing one after each `SetGoalPos`); the
+/// interval is not measured against retail (ZMB-029).
+pub const ACTOR_BAD_PATH_REPEAT: f32 = 0.5;
+
 /// The playback rate every actor clip runs at: `SetAnimKnob…( clip, 1, 0.2,
 /// 1 )`, the last argument, in every zombie script that starts one.
 pub const ANIM_RATE: f32 = 1.0;
@@ -78,6 +84,8 @@ struct Goal {
     route: Option<Route>,
     radius: f32,
     reached: bool,
+    /// With no route: seconds until the next `bad_path`.
+    bad_path_in: f32,
 }
 
 /// One playing clip: its name and normalized time.
@@ -148,6 +156,7 @@ impl Motor {
             route,
             radius,
             reached: false,
+            bad_path_in: ACTOR_BAD_PATH_REPEAT,
         });
     }
 
@@ -195,6 +204,15 @@ impl Motor {
         ground: impl Fn([f32; 3]) -> Option<f32>,
     ) -> Vec<MotorEvent> {
         let mut events = std::mem::take(&mut self.pending);
+        if let Some(goal) = self.goal.as_mut()
+            && goal.route.is_none()
+        {
+            goal.bad_path_in -= dt;
+            if goal.bad_path_in <= 0.0 {
+                goal.bad_path_in += ACTOR_BAD_PATH_REPEAT;
+                events.push(MotorEvent::BadPath);
+            }
+        }
         if !self.scripted {
             let want = if self.walking() { self.move_clip } else { IDLE };
             if self.playing.clip != want {
