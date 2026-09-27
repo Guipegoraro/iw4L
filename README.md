@@ -1,3 +1,5 @@
+> **Note:** this fork is vibe coded AI slop made for fun, alot of features are half tested!.
+
 # IW4L
 
 <p align="center">
