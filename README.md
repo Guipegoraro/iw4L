@@ -1,4 +1,4 @@
-> **Note:** this fork is "vibe coded AI slop made for fun".
+> **Note:** this fork is vibe coded AI slop made for fun, alot of features are half tested!.
 
 # IW4L
 
@@ -164,6 +164,14 @@ Changes on top of upstream, newest last. Every change is recorded here.
   3's pop height, chase camera shots and animation pipeline shapes the skate
   cards still to come. Gesture files, animations and models come from the
   player's own Skate 3 disc and are never committed here.
+- **Agent workflow.** The coding agent works card by card (ordna board in
+  `context/board/`) and is told which skill comes next at each state:
+  grill → spec → tdd → code-review → commit. The rules live in
+  [`docs/agents/`](docs/agents/) (board as issue tracker, state → skill
+  table, glossary and ADR layout), on top of the
+  [mattpocock/skills](https://github.com/mattpocock/skills) set. A
+  session-start hook lists the cards in progress with their next step, and a
+  commit hook refuses code commits without their README bullet or card id.
 
 ## Architecture
 
