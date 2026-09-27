@@ -18,6 +18,8 @@ pub const MELEEANIM: &str = "meleeanim";
 pub const NOTE_FIRE: &str = "fire";
 /// The swing's end.
 pub const NOTE_END: &str = "end";
+/// Where a swing may stop early when the enemy has left reach.
+pub const NOTE_STOP: &str = "stop";
 
 /// `GetDvarFloat( "ai_meleeRange" )`: how far the engine's `melee()` reaches.
 /// The dvar default, not read from the zone.
@@ -151,12 +153,22 @@ impl Thread<Level> for MeleeCombat {
                         _ => String::new(),
                     };
                     let level = &mut *cx.world;
-                    if note == NOTE_END {
+                    // Each `break` of the note loop: the end, a hit with no
+                    // enemy left, or `stop` when `CanContinueToMelee()` fails
+                    // (stood in for by the reach test).
+                    let enemy = zombie_and_enemy(level, actor);
+                    let leave = match note.as_str() {
+                        NOTE_END => true,
+                        NOTE_FIRE => enemy.is_none(),
+                        NOTE_STOP => !in_melee_range(level, actor),
+                        _ => false,
+                    };
+                    if leave {
                         self.pc = 2;
                         continue;
                     }
                     if note == NOTE_FIRE
-                        && let Some((origin, entnum, enemy)) = zombie_and_enemy(level, actor)
+                        && let Some((origin, entnum, enemy)) = enemy
                         && distance(origin, enemy) <= AI_MELEE_RANGE
                     {
                         let amount = level

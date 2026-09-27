@@ -14,6 +14,12 @@
 //! woken waiter *inside* the `thread`/`notify` call: here both run later in the
 //! same frame, after the thread that caused them yields. A script that depends
 //! on that interleaving within one frame has to say so where it is ported.
+//!
+//! One consequence is kept as retail has it: a waiter notified several times in
+//! one frame sees every event, in order. Retail runs it after each notify, so
+//! it is waiting again for the next; here the events that arrive while it is
+//! ready wait in its backlog, and each `waittill` it parks on this frame takes
+//! the first of them that matches.
 
 use std::collections::{BTreeMap, VecDeque};
 use std::fmt;
@@ -236,6 +242,9 @@ struct Slot<W> {
     park: Park,
     endon: Vec<(Owner, Name)>,
     woke_by: Option<Event>,
+    /// Woken by an event and not run yet: the events delivered since, which
+    /// retail would have shown to the `waittill`s it reaches this frame.
+    backlog: Option<VecDeque<Event>>,
 }
 
 impl<W> Clone for Slot<W> {
@@ -246,6 +255,7 @@ impl<W> Clone for Slot<W> {
             park: self.park.clone(),
             endon: self.endon.clone(),
             woke_by: self.woke_by.clone(),
+            backlog: self.backlog.clone(),
         }
     }
 }
@@ -426,6 +436,7 @@ impl<W> Scheduler<W> {
                 park: Park::Ready,
                 endon: Vec::new(),
                 woke_by: None,
+                backlog: None,
             },
         );
         self.ready.push_back(id);
@@ -458,6 +469,17 @@ impl<W> Scheduler<W> {
         let Some(slot) = self.threads.get_mut(&id) else {
             return;
         };
+        let mut park = park;
+        if let Some(mut backlog) = slot.backlog.take()
+            && let Park::Till { owner, names } = &park
+        {
+            let matches = |event: &Event| event.owner == *owner && names.contains(&event.name);
+            if let Some(at) = backlog.iter().position(matches) {
+                slot.woke_by = backlog.drain(..=at).next_back();
+                slot.backlog = Some(backlog);
+                park = Park::Ready;
+            }
+        }
         let now_ready = park == Park::Ready;
         slot.park = park;
         if now_ready {
@@ -474,6 +496,11 @@ impl<W> Scheduler<W> {
                 .any(|(owner, name)| *owner == event.owner && *name == event.name)
         });
         let killed = (before - self.threads.len()) as u32;
+        for slot in self.threads.values_mut() {
+            if let Some(backlog) = slot.backlog.as_mut() {
+                backlog.push_back(event.clone());
+            }
+        }
         let woken: Vec<ThreadId> = self
             .threads
             .iter()
@@ -486,6 +513,7 @@ impl<W> Scheduler<W> {
         for id in woken {
             if let Some(slot) = self.threads.get_mut(&id) {
                 slot.woke_by = Some(event.clone());
+                slot.backlog = Some(VecDeque::new());
             }
             self.make_ready(id);
         }
