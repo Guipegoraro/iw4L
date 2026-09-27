@@ -348,3 +348,153 @@ fn a_cloned_scheduler_continues_exactly_like_the_original() {
         ]
     );
 }
+
+/// `for (;;) { self waittill(name, note); log(note); if (note == "end") break; }`.
+#[derive(Clone, Debug)]
+struct NoteLoop {
+    name: &'static str,
+    end: &'static str,
+    started: bool,
+}
+
+impl Thread<Log> for NoteLoop {
+    fn resume(&mut self, cx: &mut Cx<'_, Log>) -> Yield {
+        if std::mem::replace(&mut self.started, true) {
+            let note = cx.event().and_then(|event| event.args.first().cloned());
+            cx.world.push(format!("{note:?}"));
+            if note == Some(Value::Str(self.end.into())) {
+                return Yield::Done;
+            }
+        }
+        Yield::waittill(cx.owner(), self.name)
+    }
+}
+
+#[test]
+fn every_notify_of_one_frame_reaches_the_waiter_in_order() {
+    const NOTE: &str = "meleeanim";
+    const END: &str = "end";
+    let owner = Owner(7);
+    let mut sched = Scheduler::default();
+    let mut log = Log::new();
+    sched.spawn(
+        owner,
+        NoteLoop {
+            name: NOTE,
+            end: END,
+            started: false,
+        },
+    );
+    run_frames(&mut sched, &mut log, 1);
+    for note in ["fire", "fire", END] {
+        sched.notify(owner, NOTE, vec![Value::Str(note.into())]);
+    }
+    sched.run(FRAME_MS, &mut log);
+    assert_eq!(
+        log,
+        [
+            r#"Some(Str("fire"))"#,
+            r#"Some(Str("fire"))"#,
+            r#"Some(Str("end"))"#
+        ]
+    );
+    assert_eq!(sched.thread_count(), 0, "the end note ends the loop");
+}
+
+/// `self waittill("go"); self notify("ping"); self waittill("ping"); log`.
+#[derive(Clone, Debug, Default)]
+struct PingSelf {
+    pc: u8,
+}
+
+impl Thread<Log> for PingSelf {
+    fn resume(&mut self, cx: &mut Cx<'_, Log>) -> Yield {
+        let owner = cx.owner();
+        self.pc += 1;
+        match self.pc {
+            1 => Yield::waittill(owner, "go"),
+            2 => {
+                cx.notify(owner, "ping", Vec::new());
+                Yield::waittill(owner, "ping")
+            }
+            _ => {
+                cx.world.push(format!("pinged at {}", cx.now_ms()));
+                Yield::Done
+            }
+        }
+    }
+}
+
+#[test]
+fn a_thread_does_not_hear_its_own_notify() {
+    let owner = Owner(3);
+    let mut sched = Scheduler::default();
+    let mut log = Log::new();
+    sched.spawn(owner, PingSelf::default());
+    run_frames(&mut sched, &mut log, 1);
+    sched.notify(owner, "go", Vec::new());
+    sched.run(FRAME_MS, &mut log);
+    assert!(log.is_empty(), "{log:?}");
+    sched.notify(owner, "ping", Vec::new());
+    sched.run(2 * FRAME_MS, &mut log);
+    assert_eq!(log, [format!("pinged at {}", 2 * FRAME_MS)]);
+}
+
+/// `for (;;) { self waittill("note", n); log(n); flag_wait("open"); }`.
+#[derive(Clone, Debug, Default)]
+struct NoteThenFlag {
+    waiting_note: bool,
+}
+
+impl Thread<Log> for NoteThenFlag {
+    fn resume(&mut self, cx: &mut Cx<'_, Log>) -> Yield {
+        if self.waiting_note {
+            self.waiting_note = false;
+            let note = cx.event().and_then(|event| event.args.first().cloned());
+            cx.world.push(format!("{note:?}"));
+            return Yield::FlagWait("open".into());
+        }
+        self.waiting_note = true;
+        Yield::waittill(cx.owner(), "note")
+    }
+}
+
+#[test]
+fn a_set_flag_between_waittills_keeps_the_frames_notifies() {
+    let owner = Owner(4);
+    let mut sched = Scheduler::default();
+    let mut log = Log::new();
+    sched.flag_set("open");
+    sched.spawn(owner, NoteThenFlag::default());
+    run_frames(&mut sched, &mut log, 1);
+    for n in [1, 2] {
+        sched.notify(owner, "note", vec![Value::Int(n)]);
+    }
+    sched.run(FRAME_MS, &mut log);
+    assert_eq!(log, ["Some(Int(1))", "Some(Int(2))"]);
+}
+
+#[test]
+fn an_endon_in_the_frames_notifies_kills_the_waiter_before_the_earlier_ones() {
+    // The port runs a woken waiter after the frame's notifies, so an endon
+    // that follows its event still kills it first (the module doc's rule).
+    const NOTE: &str = "note";
+    let owner = Owner(5);
+    let mut sched = Scheduler::default();
+    let mut log = Log::new();
+    sched.spawn(
+        owner,
+        WaitTillLog {
+            owner,
+            name: NOTE,
+            endon: Some("death"),
+            started: false,
+        },
+    );
+    run_frames(&mut sched, &mut log, 1);
+    sched.notify(owner, NOTE, vec![Value::Int(1)]);
+    sched.notify(owner, "death", Vec::new());
+    sched.run(FRAME_MS, &mut log);
+    assert!(log.is_empty(), "{log:?}");
+    assert_eq!(sched.thread_count(), 0);
+}

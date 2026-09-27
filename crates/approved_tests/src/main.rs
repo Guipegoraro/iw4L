@@ -3,14 +3,20 @@
 #[cfg(test)]
 mod gsc_threads;
 #[cfg(test)]
+mod path_fixtures;
+#[cfg(test)]
 mod pathnodes;
-#[cfg(test)]
-mod skate_physics;
-#[cfg(test)]
-mod zombies_rules;
 mod report;
 mod runner;
 mod scenario;
+#[cfg(test)]
+mod skate_physics;
+#[cfg(test)]
+mod zombie_actor;
+#[cfg(test)]
+mod zombie_decisions;
+#[cfg(test)]
+mod zombies_rules;
 mod scenarios {
     pub mod heavy_gameplay_lifecycle;
 }

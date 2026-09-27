@@ -18,6 +18,7 @@ zombiemode_t5.workspace = true
 movement_iw4.workspace = true
 playerstate_iw4.workspace = true
 trace_iw4.workspace = true
+xmodel_runtime.workspace = true
 
 [lints]
 workspace = true
