@@ -1,7 +1,13 @@
 //! The owner-approved end-to-end scenarios; see README.md.
 
 #[cfg(test)]
+mod gsc_threads;
+#[cfg(test)]
+mod pathnodes;
+#[cfg(test)]
 mod skate_physics;
+#[cfg(test)]
+mod zombies_rules;
 mod report;
 mod runner;
 mod scenario;

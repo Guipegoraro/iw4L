@@ -11,6 +11,10 @@ asset_transport.workspace = true
 serde_json.workspace = true
 
 [dev-dependencies]
+gsc_threads.workspace = true
+pathnodes.workspace = true
+sim.workspace = true
+zombiemode_t5.workspace = true
 movement_iw4.workspace = true
 playerstate_iw4.workspace = true
 trace_iw4.workspace = true
