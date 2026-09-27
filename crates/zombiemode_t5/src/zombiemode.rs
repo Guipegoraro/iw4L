@@ -375,7 +375,7 @@ pub fn award_grenades_for_survivors(level: &mut Level) {
 }
 
 /// `maps\_zombiemode.gsc::chalk_one_up`: the round-number chalk. Its waits pace
-/// the round start; the hud itself is MOD-038.
+/// the round start; the hud itself is ZMB-038.
 #[derive(Clone, Debug, Default)]
 pub struct ChalkOneUp {
     pc: u8,

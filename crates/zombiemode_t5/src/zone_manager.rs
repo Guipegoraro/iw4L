@@ -73,7 +73,7 @@ pub fn zone_init(level: &mut Level, zone_name: &str) {
 }
 
 /// `maps\_zombiemode_zone_manager.gsc::enable_zone`, spawner half: respawn
-/// points and barrier goals are MOD-037.
+/// points and barrier goals are ZMB-037.
 pub fn enable_zone(level: &mut Level, zone_name: &str) {
     let Some(zone) = level.zones.get_mut(zone_name) else {
         level.println(format!(
@@ -114,7 +114,7 @@ pub fn add_adjacent_zone(
 
 /// `maps\_zombiemode_zone_manager.gsc::player_in_zone`. Touching a zone's
 /// volumes needs the volumes' brushes, which the zone data does not reach
-/// yet (MOD-036), so no zone counts as occupied and `manage_zones` falls back
+/// yet (ZMB-036), so no zone counts as occupied and `manage_zones` falls back
 /// to its first initial zone, as retail does when no zone is occupied.
 pub fn player_in_zone(_level: &Level, _zone_name: &str) -> bool {
     false

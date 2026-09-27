@@ -18,4 +18,4 @@ Every code change belongs to a card, and every card moves through the same steps
 
 ## Announce the step
 
-At the start of work on a card, and again whenever the state changes, say in one line: card id, its state, the next step from this table. A skipped step is announced as a skip with its reason ("MOD-040 is a typo fix: skipping grilling and spec"). The user can then say "no, grill it".
+At the start of work on a card, and again whenever the state changes, say in one line: card id, its state, the next step from this table. A skipped step is announced as a skip with its reason ("ZMB-040 is a typo fix: skipping grilling and spec"). The user can then say "no, grill it".
