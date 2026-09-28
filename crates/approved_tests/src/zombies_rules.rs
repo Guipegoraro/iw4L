@@ -3,14 +3,15 @@
 //! how `mp/zombiemode.csv` overrides a script default. The table here is a
 //! made-up one with the retail layout, not the game's.
 
+use gsc_threads::{Cx, Owner, Scheduler, Thread, Yield};
 use sim::{ClientId, ScriptPlayer};
 use zombiemode_t5::score::{PointsEvent, player_points};
 use zombiemode_t5::utility::{ZombieVar, gsc_float, gsc_int, round_up_score, set_zombie_var};
 use zombiemode_t5::zombiemode::{
-    DIFFICULTY_COLUMN, ai_calculate_health, default_max_zombie_func, init_levelvars,
-    round_spawning_max,
+    DIFFICULTY_COLUMN, END_OF_ROUND, RoundThink, SPAWN_ZOMBIES, ZOMBIE_AI_LIMIT,
+    ai_calculate_health, default_max_zombie_func, init_levelvars, round_spawning_max,
 };
-use zombiemode_t5::{Level, StringTables};
+use zombiemode_t5::{Level, MapEnts, StringTables};
 
 fn players(n: usize) -> Vec<ScriptPlayer> {
     (0..n)
@@ -144,4 +145,56 @@ fn gsc_int_and_float_parse_like_retail() {
     assert_eq!(gsc_int(""), 0);
     assert_eq!(gsc_float("0.075"), 0.075);
     assert_eq!(gsc_float("2"), 2.0);
+}
+
+/// `level waittill( "end_of_round" )`, then a line in the log.
+#[derive(Clone, Debug, Default)]
+struct EndOfRoundSeen {
+    waiting: bool,
+}
+
+impl Thread<Level> for EndOfRoundSeen {
+    fn resume(&mut self, cx: &mut Cx<'_, Level>) -> Yield {
+        if self.waiting {
+            cx.world.println(END_OF_ROUND);
+            return Yield::Done;
+        }
+        self.waiting = true;
+        Yield::waittill(Owner::LEVEL, END_OF_ROUND)
+    }
+}
+
+#[test]
+fn a_round_whose_only_spawner_has_an_unknown_type_still_ends_with_one_warning() {
+    const FRAME_MS: u64 = 50;
+    // Round 1's handful, one per `zombie_spawn_delay`, takes far less.
+    const GIVE_UP_MS: u64 = 60_000;
+    const NOT_PORTED: &str = "actor_zombie_not_ported";
+    let mut level = level_with(1, StringTables::default());
+    level.ents = std::sync::Arc::new(MapEnts::parse(&format!(
+        "{{ \"classname\" \"{NOT_PORTED}\" \"origin\" \"0 0 0\" }}"
+    )));
+    level.enemy_spawns = vec![0];
+    level.zombie_ai_limit = ZOMBIE_AI_LIMIT;
+    let mut threads = Scheduler::default();
+    threads.flag_set(SPAWN_ZOMBIES);
+    threads.spawn(Owner::LEVEL, RoundThink::default());
+    threads.spawn(Owner::LEVEL, EndOfRoundSeen::default());
+    let mut ms = 0;
+    while !level.println.iter().any(|line| line == END_OF_ROUND) {
+        assert!(
+            ms < GIVE_UP_MS,
+            "no end_of_round: {} zombies left to spawn",
+            level.zombie_total
+        );
+        threads.run(ms, &mut level);
+        ms += FRAME_MS;
+    }
+    assert_eq!(level.enemy_count(), 0);
+    let warnings = level
+        .println
+        .iter()
+        .filter(|line| line.contains(NOT_PORTED))
+        .count();
+    assert_eq!(warnings, 1, "{:?}", level.println);
 }
