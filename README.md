@@ -128,8 +128,10 @@ Changes on top of upstream, newest last. Every change is recorded here.
   the start zone, and each zombie wears a body and head picked from the
   map's character script (the same bodies and heads the original draws).
   Each zombie walks, runs or sprints (the original roll on the round's move
-  speed) to one of the windows near its spawner, then hunts the closest
-  player and swings at them when within reach, as the original
+  speed) to the window nearest the spot its spawner points at (a spawner
+  that points nowhere picks at random among up to three nearby windows, and
+  when it has no way there tries those, then the 20 nearest), then hunts
+  the closest player and swings at them when within reach, as the original
   `_zombiemode_spawner.gsc` and `zombie_melee.gsc` do. It moves by the
   animation's own root motion along the map's path nodes and stays on the
   ground. Boards are not torn off and windows are not climbed yet: a zombie
