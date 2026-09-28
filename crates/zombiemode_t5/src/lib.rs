@@ -13,6 +13,7 @@
 pub mod actor;
 pub mod anims;
 pub mod character;
+pub mod damage;
 pub mod level;
 pub mod loadout;
 pub mod mapents;

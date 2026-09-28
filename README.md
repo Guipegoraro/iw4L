@@ -135,9 +135,18 @@ Changes on top of upstream, newest last. Every change is recorded here.
   `_zombiemode_spawner.gsc` and `zombie_melee.gsc` do. It moves by the
   animation's own root motion along the map's path nodes and stays on the
   ground. Boards are not torn off and windows are not climbed yet: a zombie
-  at its window walks straight through it. They do not take damage yet, and
-  their heads draw dark (the character skin shader is not loaded yet).
+  at its window walks straight through it. Their heads draw dark (the
+  character skin shader is not loaded yet).
   Zombies are server entities, so co-op players see the same ones.
+  The zone manager follows the players: a zone counts as occupied while a
+  living player touches one of its volumes (the map's own brush volumes),
+  and only occupied zones and their open neighbours spawn. A zombie brought
+  to no health dies as the original's `zombie_death_event` counts it: it
+  leaves the map, the kill is counted, the killer is paid the kill's points,
+  and once every zombie of the round is dead the round ends and the next
+  one starts. A zombie that never finds a way to any window gives up after
+  20 s and dies, as in the original. Players cannot shoot zombies yet, so
+  in play a round does not end yet.
   A spawner whose zombie type is not ported yet (a custom map's) spawns
   nothing: the log says so once per type, and its zombies count as spawned,
   so the round still ends.

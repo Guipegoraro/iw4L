@@ -1,6 +1,7 @@
 //! `maps\_zombiemode_score.gsc`
 
 use crate::Level;
+use crate::damage::{MOD_BURNED, MOD_MELEE, MOD_UNKNOWN};
 use crate::utility::round_up_score;
 
 /// What earned the points, as `player_add_points( event, … )` names it.
@@ -38,10 +39,10 @@ pub fn player_add_points_kill_bonus(
     means_of_death: &str,
     hit_location: &str,
 ) -> i32 {
-    if means_of_death == "MOD_MELEE" {
+    if means_of_death == MOD_MELEE {
         return level.zombie_var("zombie_score_bonus_melee").as_i32();
     }
-    if means_of_death == "MOD_BURNED" {
+    if means_of_death == MOD_BURNED {
         return level.zombie_var("zombie_score_bonus_burn").as_i32();
     }
     let var = match hit_location {
@@ -69,7 +70,7 @@ pub fn player_points(level: &Level, event: PointsEvent<'_>) -> i32 {
         } => {
             let bonus = player_add_points_kill_bonus(level, means_of_death, hit_location);
             let bonus = if level.zombie_var("zombie_powerup_insta_kill_on").as_i32() == 1
-                && means_of_death == "MOD_UNKNOWN"
+                && means_of_death == MOD_UNKNOWN
             {
                 bonus * 2
             } else {

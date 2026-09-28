@@ -152,6 +152,8 @@ pub fn spawn_zombie(level: &mut crate::Level, spawner: u32) -> Result<u32, Spawn
             melee_damage: ZOMBIE_MELEE_DAMAGE,
             melee_attack_dist: None,
             meleeing: false,
+            // `zombie_spawn_init`: `self.ignoreall = true`.
+            ignore_all: true,
             zombie_bad_path: None,
         },
     );

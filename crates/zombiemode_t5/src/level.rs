@@ -40,6 +40,8 @@ pub enum EngineCommand {
         yaw: f32,
         anim: &'static str,
     },
+    /// A dead zombie's actor leaves the world (no corpse is kept yet).
+    DeleteActor { actor: u32 },
     /// `player DoDamage( amount, origin, zombie, 0, "MOD_MELEE" )` from the
     /// engine's `melee()`.
     MeleePlayer {
@@ -70,6 +72,9 @@ pub struct Zombie {
     pub melee_attack_dist: Option<f32>,
     /// In `MeleeCombat`.
     pub meleeing: bool,
+    /// `self.ignoreall`: set at spawn, cleared by
+    /// `zombie_setup_attack_properties` once it reaches its window.
+    pub ignore_all: bool,
     /// `self.zombie_bad_path`: what the last `zombie_bad_path()` saw, a
     /// `bad_path` (true) or its timeout (false); `None` while it waits.
     pub zombie_bad_path: Option<bool>,
@@ -126,6 +131,21 @@ pub struct Level {
 
     /// `println(...)` lines, written to the log after the frame.
     pub println: Vec<String>,
+
+    /// Zone volumes (entity indices) a living player touches this frame, as
+    /// the engine's `IsTouching` sees them before the frame's threads run.
+    pub occupied_volumes: BTreeSet<u32>,
+
+    /// `DoDamage` on zombies, applied after the frame's threads
+    /// (`damage::apply_zombie_damage`).
+    pub pending_damage: Vec<crate::damage::ZombieDamage>,
+
+    /// `level.zombies_timeout_spawn`: zombies that died of giving up.
+    pub zombies_timeout_spawn: i32,
+    /// `level.global_zombies_killed`: every zombie death, whatever killed it.
+    pub global_zombies_killed: i32,
+    /// `level.zombie_player_killed_count`: deaths a player caused.
+    pub zombie_player_killed_count: i32,
 
     /// Spawner classnames with no aitype the port knows, warned about once.
     pub unknown_spawner_types: BTreeSet<String>,

@@ -3,9 +3,11 @@
 //! spawners; a zone spawns while a player stands in it or in an enabled,
 //! connected neighbour.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use gsc_threads::{Cx, Thread, Yield};
+
+use sim::ScriptPlayer;
 
 use crate::Level;
 use crate::mapents::{TARGET, TARGETNAME};
@@ -116,12 +118,62 @@ pub fn add_adjacent_zone(
     }
 }
 
-/// `maps\_zombiemode_zone_manager.gsc::player_in_zone`. Touching a zone's
-/// volumes needs the volumes' brushes, which the zone data does not reach
-/// yet (ZMB-036), so no zone counts as occupied and `manage_zones` falls back
-/// to its first initial zone, as retail does when no zone is occupied.
-pub fn player_in_zone(_level: &Level, _zone_name: &str) -> bool {
-    false
+/// `maps\_zombiemode_zone_manager.gsc::player_in_zone`: an enabled zone one
+/// of whose volumes a player (not a spectator) touches.
+pub fn player_in_zone(level: &Level, zone_name: &str) -> bool {
+    level.zones.get(zone_name).is_some_and(|zone| {
+        zone.is_enabled
+            && zone
+                .volumes
+                .iter()
+                .any(|volume| level.occupied_volumes.contains(volume))
+    })
+}
+
+/// A zone volume as the engine checks the players against it: the entity,
+/// its brush model and where the map placed that model.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ZoneVolume {
+    pub ent: u32,
+    pub model: u32,
+    pub origin: [f32; 3],
+    pub angles: [f32; 3],
+}
+
+/// The zone volumes (entity indices) a living player touches, by the
+/// engine's `IsTouching` passed in as `touches`.
+pub fn occupied_volumes(
+    level: &Level,
+    touches: impl Fn(&ScriptPlayer, &ZoneVolume) -> bool,
+) -> BTreeSet<u32> {
+    zone_volume_models(level)
+        .into_iter()
+        .filter(|volume| {
+            level
+                .players
+                .iter()
+                .any(|player| player.alive && touches(player, volume))
+        })
+        .map(|volume| volume.ent)
+        .collect()
+}
+
+/// Every zone volume that is a brush model.
+pub fn zone_volume_models(level: &Level) -> Vec<ZoneVolume> {
+    level
+        .zones
+        .values()
+        .flat_map(|zone| zone.volumes.iter().copied())
+        .filter_map(|ent| {
+            let volume = level.ents.get(ent)?;
+            Some(ZoneVolume {
+                ent,
+                model: volume.brush_model()?,
+                origin: volume.origin(),
+                angles: volume.angles(),
+            })
+        })
+        .collect()
 }
 
 /// `maps\_zombiemode_zone_manager.gsc::create_spawner_list`, zombie spawners

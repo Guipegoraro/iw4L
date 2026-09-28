@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use gsc_threads::Owner;
 use pathnodes::{PathGraph, Route};
+use sim::ClientId;
 
 use crate::anims::IDLE;
 use xmodel_runtime::AnimClip;
@@ -35,6 +36,14 @@ pub const ACTOR_BAD_PATH_REPEAT: f32 = 0.5;
 /// The playback rate every actor clip runs at: `SetAnimKnob…( clip, 1, 0.2,
 /// 1 )`, the last argument, in every zombie script that starts one.
 pub const ANIM_RATE: f32 = 1.0;
+
+/// A player's script owner (`self` in a player thread, `player notify`):
+/// one above its entity number, because owner 0 is `level`.
+pub fn player_owner(client: ClientId) -> Owner {
+    Owner(PLAYER_OWNER_BASE + u64::from(client.0))
+}
+
+const PLAYER_OWNER_BASE: u64 = 1;
 
 /// A zombie actor's script owner: actors sit above every entity number.
 pub fn actor_owner(actor: u32) -> Owner {

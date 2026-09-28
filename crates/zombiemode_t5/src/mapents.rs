@@ -6,6 +6,8 @@
 pub const TARGET: &str = "target";
 /// The key other entities point at, and `getent( name, "targetname" )`.
 pub const TARGETNAME: &str = "targetname";
+/// `ent.model`; a brush model is `*N`.
+pub const MODEL: &str = "model";
 /// `ent.script_string`.
 pub const SCRIPT_STRING: &str = "script_string";
 
@@ -26,6 +28,11 @@ impl MapEnt {
 
     pub fn classname(&self) -> &str {
         self.get("classname").unwrap_or("")
+    }
+
+    /// The brush model an entity is (`"model" "*N"` gives N).
+    pub fn brush_model(&self) -> Option<u32> {
+        self.get(MODEL)?.strip_prefix('*')?.parse().ok()
     }
 
     pub fn origin(&self) -> [f32; 3] {

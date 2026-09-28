@@ -90,6 +90,16 @@ impl ModeScript for ZombiesMode {
     fn frame(&mut self, engine: &mut ModeEngine<'_, '_>) {
         self.level.now_ms = engine.now_ms();
         self.level.players = engine.players();
+        // `IsTouching` for `player_in_zone`, ahead of the frame's threads.
+        self.level.occupied_volumes =
+            crate::zone_manager::occupied_volumes(&self.level, |player, volume| {
+                engine.player_touches_brush_model(
+                    player.client,
+                    volume.model,
+                    volume.origin,
+                    volume.angles,
+                )
+            });
         // Retail's players are all in once the connected count reaches the
         // expected one; here that is everyone who joined having spawned.
         if !self.threads.flag(ALL_PLAYERS_CONNECTED)
@@ -106,6 +116,7 @@ impl ModeScript for ZombiesMode {
                 report.resumed
             );
         }
+        crate::damage::apply_zombie_damage(&mut self.level, &mut self.threads);
         for command in self.level.commands.drain(..) {
             match command {
                 EngineCommand::SetWeaponAmmoClip {
@@ -121,6 +132,10 @@ impl ModeScript for ZombiesMode {
                     yaw,
                     anim,
                 } => {
+                    // Killed before the engine spawned it: nothing to spawn.
+                    if !self.level.zombies.contains_key(&actor) {
+                        continue;
+                    }
                     let head = sim::actors::ActorAttachment {
                         model: head.to_owned(),
                         tag: None,
@@ -128,10 +143,8 @@ impl ModeScript for ZombiesMode {
                     match engine.spawn_actor(actor, body, &[head], origin, yaw) {
                         Ok(_) => {
                             engine.actor_play_anim(actor, anim, true, actor::ANIM_RATE);
-                            // `spawner add_spawn_function( zombie_spawn_init )`
-                            // ends in `self thread zombie_think()`.
-                            self.threads
-                                .spawn(actor_owner(actor), crate::spawner::ZombieThink);
+                            // `spawner add_spawn_function( zombie_spawn_init )`.
+                            crate::spawner::zombie_spawn_init_threads(&mut self.threads, actor);
                         }
                         Err(error) => {
                             // Retail's `spawn_failed`: the zombie never was.
@@ -143,6 +156,9 @@ impl ModeScript for ZombiesMode {
                             );
                         }
                     }
+                }
+                EngineCommand::DeleteActor { actor } => {
+                    engine.delete_actor(actor);
                 }
                 EngineCommand::MeleePlayer {
                     client,

@@ -17,6 +17,9 @@ use crate::world::{ClientId, Tick};
 /// the same step a player takes.
 pub const ACTOR_STEP_HEIGHT: f32 = movement_iw4::STEP_SIZE;
 
+/// Every contents bit: a volume is touched whatever its brushes are made of.
+const ALL_CONTENTS: u32 = u32::MAX;
+
 /// How far below an actor the ground trace looks: the drop it may step down.
 pub const ACTOR_GROUND_PROBE: f32 = 64.0;
 
@@ -198,6 +201,41 @@ impl<'a, 'w> ModeEngine<'a, 'w> {
 
     pub fn has_actor_model(&self, model: &str) -> bool {
         self.world.actor_models().contains(model)
+    }
+
+    /// `player IsTouching( volume )` for a brush-model volume (`"model"
+    /// "*N"`, `model` = N) placed at `origin` and `angles`: the player's
+    /// linked box against the model's brushes, whatever their contents. False
+    /// for a player not linked in the world or a model the map does not have.
+    pub fn player_touches_brush_model(
+        &self,
+        client: ClientId,
+        model: u32,
+        origin: [f32; 3],
+        angles: [f32; 3],
+    ) -> bool {
+        let Some(bounds) = self.world.player_area_bounds(client) else {
+            return false;
+        };
+        let Some(cmodel) =
+            clipmap_iw4::clip_handle_to_model(&self.world.clip_cmodels().models, model)
+        else {
+            return false;
+        };
+        let (mid, half) = (bounds.mid(), bounds.half());
+        let trace = clipmap_iw4::transformed_capsule_trace(
+            cmodel,
+            &self.world.clip_bsp().leafbrushes,
+            self.world.clip_brushes(),
+            mid,
+            mid,
+            [-half[0], -half[1], -half[2]],
+            half,
+            origin,
+            angles,
+            ALL_CONTENTS,
+        );
+        trace.startsolid != 0
     }
 
     /// An installed actor animation: its length, root motion and notes.

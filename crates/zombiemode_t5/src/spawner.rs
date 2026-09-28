@@ -8,11 +8,12 @@
 //! of `zombie_assure_node` (ZMB-041), the breadcrumbs of `zombie_pathing` for an unreachable player, points of
 //! interest, and the ignore list that splits a crowd between players.
 
-use gsc_threads::{Cx, Owner, Thread, Yield, call};
+use gsc_threads::{Cx, Owner, Scheduler, Thread, Value, Yield, call};
 use sim::ClientId;
 
 use crate::Level;
-use crate::actor::{self, BAD_PATH, DEATH, GOAL, Orient, actor_number};
+use crate::actor::{self, BAD_PATH, DEATH, GOAL, Orient, actor_number, actor_owner, player_owner};
+use crate::damage::{Corpse, HIT_NONE, MOD_UNKNOWN, ZombieDamage};
 use crate::level::Zombie;
 use crate::mapents::{SCRIPT_STRING, TARGET, TARGETNAME};
 use crate::zombiemode::INTERMISSION;
@@ -54,6 +55,10 @@ pub const ASSURE_NODE_RETRY_WAIT: f32 = 2.0;
 pub const ASSURE_NODE_CLOSEST: usize = 20;
 /// `wait( 20 )` before `zombie_assure_node` gives up on the zombie, seconds.
 pub const ASSURE_NODE_GIVE_UP: f32 = 20.0;
+/// `self.health + 10`: the damage that gives up on the zombie.
+pub const ASSURE_NODE_OVERKILL: i32 = 10;
+/// `level notify( "zom_kill" )`: a zombie died.
+pub const ZOM_KILL: &str = "zom_kill";
 /// `wait( 1 )` in `find_flesh` when no player is valid, seconds.
 pub const FIND_FLESH_NO_PLAYER_WAIT: f32 = 1.0;
 /// `RandomFloatRange( 1, 3 )` in `find_flesh`: the fewest seconds before it
@@ -235,6 +240,7 @@ impl Thread<Level> for ZombieThink {
 
 /// `maps\_zombiemode_spawner.gsc::zombie_setup_attack_properties`.
 pub fn zombie_setup_attack_properties(zombie: &mut Zombie) {
+    zombie.ignore_all = false;
     zombie.melee_attack_dist = Some(MELEE_ATTACK_DIST);
 }
 
@@ -347,9 +353,21 @@ impl Thread<Level> for ZombieAssureNode {
                     self.pc = 1;
                 }
                 _ => {
-                    // `self DoDamage( self.health + 10, self.origin )` and
-                    // `level.zombies_timeout_spawn++` wait for zombie death
-                    // (ZMB-041): the zombie stays where it is.
+                    // `self DoDamage( self.health + 10, self.origin );` The
+                    // death is immediate in retail and this thread ends on
+                    // it (`endon( "death" )`), so its own
+                    // `level.zombies_timeout_spawn++` never runs:
+                    // `zombie_death_event` counts the timeout.
+                    let level = &mut *cx.world;
+                    if let Some(zombie) = level.zombies.get(&actor) {
+                        level.pending_damage.push(ZombieDamage {
+                            actor,
+                            amount: zombie.health + ASSURE_NODE_OVERKILL,
+                            attacker: None,
+                            means_of_death: MOD_UNKNOWN,
+                            hit_location: HIT_NONE,
+                        });
+                    }
                     return Yield::Done;
                 }
             }
@@ -528,5 +546,85 @@ impl Thread<Level> for ZombieFollowEnemy {
             }
         }
         Yield::wait_seconds(extra_wait + FOLLOW_ENEMY_TICK)
+    }
+}
+
+/// `zombie_spawn_init`'s thread for a zombie the engine spawned: `self
+/// thread zombie_think()`. Its `level thread zombie_death_event( self )`
+/// starts at the death instead (`damage::apply_zombie_damage`).
+pub fn zombie_spawn_init_threads(threads: &mut Scheduler<Level>, actor: u32) {
+    threads.spawn(actor_owner(actor), ZombieThink);
+}
+
+/// `maps\_zombiemode_spawner.gsc::zombie_death_animscript`, the zombie's
+/// `deathFunction`, kept under its GSC name: of its steps only the killer's
+/// points are ported; powerup drops, gibs and death effects are not.
+pub fn zombie_death_animscript(level: &mut Level, damage: &ZombieDamage) {
+    zombie_death_points(level, damage);
+}
+
+/// `maps\_zombiemode_spawner.gsc::zombie_death_points`: a player's kill pays
+/// `player_add_points( "death", mod, hit_location )`.
+pub fn zombie_death_points(level: &mut Level, damage: &ZombieDamage) {
+    let Some(entnum) = damage
+        .attacker
+        .and_then(|client| level.player(client))
+        .map(|player| player.entnum)
+    else {
+        return;
+    };
+    crate::score::player_add_points(
+        level,
+        entnum,
+        crate::score::PointsEvent::Death {
+            means_of_death: damage.means_of_death,
+            hit_location: damage.hit_location,
+        },
+    );
+}
+
+/// `maps\_zombiemode_spawner.gsc::zombie_death_event`, after its
+/// `waittill( "death" )`: the kill is counted. A zombie no player killed
+/// while it still ignored everyone (it never reached its window) counts as
+/// timed out. Not ported: `check_zombie_death_event_callbacks` (the mod
+/// hook, with the other GSC hooks), the attacker's `killcounter` (no
+/// per-player stats yet), the trap and freezegun counts and the
+/// `marked_for_death` guard (no traps yet), the eye glow, vocals, the
+/// `sound_damage_player` dialog and the kill log line.
+#[derive(Clone, Debug)]
+pub struct ZombieDeathEvent {
+    corpse: Corpse,
+}
+
+impl ZombieDeathEvent {
+    pub fn new(corpse: Corpse) -> Self {
+        Self { corpse }
+    }
+}
+
+impl Thread<Level> for ZombieDeathEvent {
+    fn resume(&mut self, cx: &mut Cx<'_, Level>) -> Yield {
+        let level = &mut *cx.world;
+        level.global_zombies_killed += 1;
+        let attacker = self
+            .corpse
+            .attacker
+            .filter(|&client| level.player(client).is_some());
+        match attacker {
+            Some(attacker) => {
+                level.zombie_player_killed_count += 1;
+                // `zombie.attacker notify( "zom_kill", zombie )`.
+                cx.notify(
+                    player_owner(attacker),
+                    ZOM_KILL,
+                    vec![Value::Owner(actor_owner(self.corpse.actor))],
+                );
+            }
+            None if self.corpse.ignore_all => level.zombies_timeout_spawn += 1,
+            None => {}
+        }
+        cx.notify(Owner::LEVEL, ZOM_KILL, Vec::new());
+        cx.world.total_zombies_killed += 1;
+        Yield::Done
     }
 }

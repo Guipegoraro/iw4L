@@ -219,10 +219,12 @@ fn default_topics() -> Vec<ModGuideTopic> {
             .line("frag grenades and the knife. No class menu, no MW2 perks.")
             .line("Co-op: all players are on one team and cannot hurt each other.")
             .line("")
-            .line("Rounds spawn zombies at the map's spawners. They walk to a")
-            .line("window, then chase the closest player and swing when close.")
-            .line("Not yet ported: shooting them, points for kills, and boards")
-            .line("on the windows (zombies walk straight through for now)."),
+            .line("Rounds spawn zombies at the spawners of the zones players")
+            .line("stand in. They walk to a window, then chase the closest")
+            .line("player and swing when close. Each kill pays points, and")
+            .line("the round ends once all its zombies are dead; but they")
+            .line("cannot be shot yet, so in play a round runs on. Boards on")
+            .line("the windows are not ported either (zombies walk through)."),
         ModGuideTopic::new("commands", "COMMANDS")
             .line("Open the console with the ` key. Added by this fork:")
             .line("")
