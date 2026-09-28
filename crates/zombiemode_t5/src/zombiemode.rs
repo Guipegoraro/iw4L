@@ -4,7 +4,7 @@ use gsc_threads::{Cx, Owner, Thread, Yield, call};
 
 use crate::Level;
 use crate::level::{EngineCommand, PlayerScore};
-use crate::utility::{ZombieVar, set_zombie_var};
+use crate::utility::{SpawnFailed, ZombieVar, set_zombie_var, spawn_zombie};
 
 /// `level notify( "intermission" )`: the game is over.
 pub const INTERMISSION: &str = "intermission";
@@ -22,12 +22,18 @@ pub const ALL_PLAYERS_CONNECTED: &str = "all_players_connected";
 /// `difficulty_init`: retail zombies always reads the MEDIUM column.
 pub const DIFFICULTY_COLUMN: usize = 2;
 
+/// `flag( "spawn_zombies" )`: `round_spawning` spawns only while it is set.
+pub const SPAWN_ZOMBIES: &str = "spawn_zombies";
+
+/// `level.zombie_ai_limit`, as `main` sets it: the most zombies alive at once.
+pub const ZOMBIE_AI_LIMIT: i32 = 24;
+
 /// `maps\_zombiemode.gsc::init_flags`, with `flag_init( "spawn_zombies", true )`.
 pub const INIT_FLAGS: &[(&str, bool)] = &[
     ("spawn_point_override", false),
     ("power_on", false),
     ("crawler_round", false),
-    ("spawn_zombies", true),
+    (SPAWN_ZOMBIES, true),
     ("dog_round", false),
     ("begin_spawning", false),
     ("end_round_wait", false),
@@ -162,7 +168,7 @@ pub struct Main;
 impl Thread<Level> for Main {
     fn resume(&mut self, cx: &mut Cx<'_, Level>) -> Yield {
         init_levelvars(cx.world);
-        cx.world.zombie_ai_limit = 24;
+        cx.world.zombie_ai_limit = ZOMBIE_AI_LIMIT;
         crate::powerups::init_vars(cx.world);
         for (flag, set) in INIT_FLAGS {
             if *set {
@@ -501,8 +507,8 @@ impl Thread<Level> for RoundSpawning {
                         return Yield::wait_seconds(0.1);
                     }
                     self.pc = 2;
-                    if !cx.flag("spawn_zombies") {
-                        return Yield::FlagWait("spawn_zombies".into());
+                    if !cx.flag(SPAWN_ZOMBIES) {
+                        return Yield::FlagWait(SPAWN_ZOMBIES.into());
                     }
                 }
                 2 => {
@@ -521,8 +527,13 @@ impl Thread<Level> for RoundSpawning {
                         spawn_point = level.enemy_spawns[pick];
                     }
                     self.old_spawn = Some(spawn_point);
-                    if crate::utility::spawn_zombie(level, spawn_point).is_some() {
-                        level.zombie_total -= 1;
+                    match spawn_zombie(level, spawn_point) {
+                        // Retail retries a failed spawn; a type the port
+                        // cannot spawn never succeeds, so it counts as
+                        // spawned and the round can still end (with fewer
+                        // real zombies than `zombie_total` said).
+                        Ok(_) | Err(SpawnFailed::UnknownAiType) => level.zombie_total -= 1,
+                        Err(SpawnFailed::NoSpawner) => {}
                     }
                     self.pc = 3;
                     return Yield::wait_seconds(level.zombie_var("zombie_spawn_delay").as_f32());

@@ -7,7 +7,7 @@
 //! What a script asks of the engine is queued in [`Level::commands`] and applied
 //! after the frame's threads have run.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use sim::{ClientId, ScriptPlayer};
@@ -126,6 +126,9 @@ pub struct Level {
 
     /// `println(...)` lines, written to the log after the frame.
     pub println: Vec<String>,
+
+    /// Spawner classnames with no aitype the port knows, warned about once.
+    pub unknown_spawner_types: BTreeSet<String>,
 
     pub commands: Vec<EngineCommand>,
 }

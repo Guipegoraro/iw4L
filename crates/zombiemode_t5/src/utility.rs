@@ -98,18 +98,37 @@ pub fn wait_network_frame() -> gsc_threads::Yield {
 /// `self.meleeDamage` from `maps\_zombiemode_spawner.gsc::zombie_spawn_init`.
 pub const ZOMBIE_MELEE_DAMAGE: i32 = 60;
 
+/// Why [`spawn_zombie`] made no zombie.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SpawnFailed {
+    /// No entity at that index.
+    NoSpawner,
+    /// Its classname is no aitype the port knows, so it never will spawn.
+    UnknownAiType,
+}
+
 /// `maps\_zombiemode_utility.gsc::spawn_zombie`: spawns from `spawner` (an
 /// entity index) through its aitype and character, with the run cycle
 /// `zombie_spawn_init` picks. Returns the actor number; the engine spawn is
-/// queued for after the frame, and the caller starts its `zombie_think`.
-pub fn spawn_zombie(level: &mut crate::Level, spawner: u32) -> Option<u32> {
-    let ent = level.ents.get(spawner)?.clone();
+/// queued for after the frame, and the caller starts its `zombie_think`. An
+/// unknown spawner type is reported once per classname.
+pub fn spawn_zombie(level: &mut crate::Level, spawner: u32) -> Result<u32, SpawnFailed> {
+    let ent = level
+        .ents
+        .get(spawner)
+        .ok_or(SpawnFailed::NoSpawner)?
+        .clone();
     let Some(aitype) = crate::character::aitype_for_classname(ent.classname()) else {
-        level.println(format!(
-            "spawn_zombie: no aitype for spawner classname {}",
-            ent.classname()
-        ));
-        return None;
+        if level
+            .unknown_spawner_types
+            .insert(ent.classname().to_owned())
+        {
+            level.println(format!(
+                "spawn_zombie: no aitype for spawner classname {}; its zombies count as spawned",
+                ent.classname()
+            ));
+        }
+        return Err(SpawnFailed::UnknownAiType);
     };
     let (body, head) = crate::character::pick_models(level, &aitype.character);
     let move_speed = crate::anims::set_run_speed(level);
@@ -146,5 +165,5 @@ pub fn spawn_zombie(level: &mut crate::Level, spawner: u32) -> Option<u32> {
             yaw,
             anim: move_clip,
         });
-    Some(actor)
+    Ok(actor)
 }

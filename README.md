@@ -138,6 +138,9 @@ Changes on top of upstream, newest last. Every change is recorded here.
   at its window walks straight through it. They do not take damage yet, and
   their heads draw dark (the character skin shader is not loaded yet).
   Zombies are server entities, so co-op players see the same ones.
+  A spawner whose zombie type is not ported yet (a custom map's) spawns
+  nothing: the log says so once per type, and its zombies count as spawned,
+  so the round still ends.
   World surfaces with Black Ops terrain-scorch techniques (`*_sco`, most of
   Nacht's walls and floors) draw with their real materials, never scorched:
   IW4L has no scorch system, so the runtime scorch vertex stream is left
