@@ -5,12 +5,17 @@
 
 use gsc_threads::{Cx, Owner, Scheduler, Thread, Yield};
 use sim::{ClientId, ScriptPlayer};
+use zombiemode_t5::actor::player_owner;
+use zombiemode_t5::damage::{ZombieDamage, apply_zombie_damage};
+use zombiemode_t5::level::EngineCommand;
 use zombiemode_t5::score::{PointsEvent, player_points};
+use zombiemode_t5::spawner::{ZOM_KILL, zombie_spawn_init_threads};
 use zombiemode_t5::utility::{ZombieVar, gsc_float, gsc_int, round_up_score, set_zombie_var};
 use zombiemode_t5::zombiemode::{
     DIFFICULTY_COLUMN, END_OF_ROUND, RoundThink, SPAWN_ZOMBIES, ZOMBIE_AI_LIMIT,
     ai_calculate_health, default_max_zombie_func, init_levelvars, round_spawning_max,
 };
+use zombiemode_t5::zone_manager::{enable_zone, occupied_volumes, player_in_zone, zone_init};
 use zombiemode_t5::{Level, MapEnts, StringTables};
 
 fn players(n: usize) -> Vec<ScriptPlayer> {
@@ -147,6 +152,23 @@ fn gsc_int_and_float_parse_like_retail() {
     assert_eq!(gsc_float("2"), 2.0);
 }
 
+/// `owner waittill( "zom_kill" )` over and over, a log line each time.
+#[derive(Clone, Debug)]
+struct ZomKillSeen {
+    owner: Owner,
+    tag: &'static str,
+    waiting: bool,
+}
+
+impl Thread<Level> for ZomKillSeen {
+    fn resume(&mut self, cx: &mut Cx<'_, Level>) -> Yield {
+        if std::mem::replace(&mut self.waiting, true) {
+            cx.world.println(self.tag);
+        }
+        Yield::waittill(self.owner, ZOM_KILL)
+    }
+}
+
 /// `level waittill( "end_of_round" )`, then a line in the log.
 #[derive(Clone, Debug, Default)]
 struct EndOfRoundSeen {
@@ -197,4 +219,131 @@ fn a_round_whose_only_spawner_has_an_unknown_type_still_ends_with_one_warning() 
         .filter(|line| line.contains(NOT_PORTED))
         .count();
     assert_eq!(warnings, 1, "{:?}", level.println);
+}
+
+#[test]
+fn a_round_whose_zombies_all_die_ends_and_the_next_one_starts() {
+    // One Nacht spawner and two players; player 1 kills every zombie (client
+    // 1, so a player owner that collided with an entity number would show): odd ones in the frame they
+    // are created (before the engine spawns them), even ones the frame after.
+    // Round 1 ends through the real `round_think`, every kill counts, pays
+    // and is notified on the level and on the killer, and round 2 begins.
+    const FRAME_MS: u64 = 50;
+    const GIVE_UP_MS: u64 = 120_000;
+    const MOD: &str = "MOD_RIFLE_BULLET";
+    const HIT: &str = "torso_upper";
+    const LEVEL_KILL: &str = "level zom_kill";
+    const PLAYER_KILL: &str = "player zom_kill";
+    let player = ClientId(1);
+    let mut level = level_with(2, StringTables::default());
+    level.ents = std::sync::Arc::new(MapEnts::parse(
+        "{ \"classname\" \"actor_zombie_ger_zombie\" \"origin\" \"0 0 0\" }",
+    ));
+    level.enemy_spawns = vec![0];
+    level.zombie_ai_limit = ZOMBIE_AI_LIMIT;
+    let round_one = default_max_zombie_func(true, 1, round_spawning_max(&level, 1, 2));
+    let kill_points = player_points(
+        &level,
+        PointsEvent::Death {
+            means_of_death: MOD,
+            hit_location: HIT,
+        },
+    );
+    let mut threads = Scheduler::default();
+    threads.flag_set(SPAWN_ZOMBIES);
+    threads.spawn(Owner::LEVEL, RoundThink::default());
+    threads.spawn(Owner::LEVEL, EndOfRoundSeen::default());
+    for (owner, tag) in [
+        (Owner::LEVEL, LEVEL_KILL),
+        (player_owner(player), PLAYER_KILL),
+    ] {
+        threads.spawn(
+            owner,
+            ZomKillSeen {
+                owner,
+                tag,
+                waiting: false,
+            },
+        );
+    }
+    let shoot = |level: &mut Level, actor: u32| {
+        let amount = level.zombie_health;
+        level.pending_damage.push(ZombieDamage {
+            actor,
+            amount,
+            attacker: Some(player),
+            means_of_death: MOD,
+            hit_location: HIT,
+        });
+    };
+
+    let mut ms = 0;
+    while level.round_number < 2 {
+        assert!(
+            ms < GIVE_UP_MS,
+            "round 1 never ended: {} killed",
+            level.total_zombies_killed
+        );
+        // In the mode's order: the frame's threads, the damage, then the
+        // engine commands (a zombie already dead is never spawned).
+        let standing: Vec<u32> = level.zombies.keys().copied().collect();
+        threads.run(ms, &mut level);
+        for &actor in &standing {
+            shoot(&mut level, actor);
+        }
+        let fresh: Vec<u32> = level
+            .zombies
+            .keys()
+            .copied()
+            .filter(|actor| actor % 2 == 1 && !standing.contains(actor))
+            .collect();
+        for actor in fresh {
+            shoot(&mut level, actor);
+        }
+        apply_zombie_damage(&mut level, &mut threads);
+        for command in std::mem::take(&mut level.commands) {
+            if let EngineCommand::SpawnActor { actor, .. } = command
+                && level.zombies.contains_key(&actor)
+            {
+                zombie_spawn_init_threads(&mut threads, actor);
+            }
+        }
+        ms += FRAME_MS;
+    }
+
+    assert!(level.println.iter().any(|line| line == END_OF_ROUND));
+    assert_eq!(level.total_zombies_killed, round_one);
+    assert_eq!(level.zombie_player_killed_count, round_one);
+    assert_eq!(level.zombies_timeout_spawn, 0);
+    assert_eq!(level.scores[&1].score_total, round_one * kill_points);
+    let seen = |tag: &str| level.println.iter().filter(|line| *line == tag).count() as i32;
+    assert_eq!(seen(LEVEL_KILL), round_one);
+    assert_eq!(seen(PLAYER_KILL), round_one);
+}
+
+#[test]
+fn a_zone_is_occupied_while_a_living_player_touches_one_of_its_volumes() {
+    let mut level = level_with(2, StringTables::default());
+    level.ents = std::sync::Arc::new(MapEnts::parse(
+        "{ \"classname\" \"info_volume\" \"targetname\" \"start_zone\" \"model\" \"*3\" \"origin\" \"0 0 0\" }\n\
+         { \"classname\" \"info_volume\" \"targetname\" \"start_zone\" \"model\" \"*4\" \"origin\" \"500 0 0\" }\n\
+         { \"classname\" \"info_volume\" \"targetname\" \"upstairs_zone\" \"model\" \"*5\" \"origin\" \"0 0 200\" }",
+    ));
+    zone_init(&mut level, "start_zone");
+    zone_init(&mut level, "upstairs_zone");
+    enable_zone(&mut level, "start_zone");
+    enable_zone(&mut level, "upstairs_zone");
+    // Player 0 stands in model *4 (the start zone's second volume); player 1
+    // stands in *5 upstairs, but is dead.
+    level.players[1].alive = false;
+    let occupied = occupied_volumes(&level, |player, volume| {
+        matches!((player.entnum, volume.model), (0, 4) | (1, 5))
+    });
+    assert_eq!(occupied.into_iter().collect::<Vec<_>>(), [1]);
+    level.occupied_volumes = [1].into();
+    assert!(player_in_zone(&level, "start_zone"));
+    assert!(!player_in_zone(&level, "upstairs_zone"));
+    // A disabled zone is never occupied (`zone_is_enabled` comes first).
+    level.zones.get_mut("start_zone").unwrap().is_enabled = false;
+    assert!(!player_in_zone(&level, "start_zone"));
 }

@@ -13,6 +13,7 @@ use zombiemode_t5::actor::{self, ACTOR_BAD_PATH_REPEAT, MotorEvent, actor_owner}
 use zombiemode_t5::anims::{
     MoveSpeed, pick_zombie_melee_anim, set_run_speed, set_zombie_run_cycle,
 };
+use zombiemode_t5::damage::apply_zombie_damage;
 use zombiemode_t5::spawner::{Entrance, ZombieAssureNode, get_closest_valid_player, pick_entrance};
 use zombiemode_t5::utility::spawn_zombie;
 use zombiemode_t5::{Level, MapEnts, StringTables};
@@ -269,10 +270,12 @@ fn the_closest_valid_player_skips_the_dead() {
 }
 
 #[test]
-fn a_zombie_with_no_way_to_any_window_walks_its_entrances_then_the_closest_then_gives_up() {
+fn a_zombie_with_no_way_to_any_window_walks_its_entrances_then_the_closest_then_gives_up_and_dies()
+{
     // No path nodes, so every goal is a `bad_path`. `zombie_assure_node`
     // sends it to each entrance node, waits 2 s, sends it to the (up to) 20
-    // windows closest to it, nearest first, then waits 20 s and gives up.
+    // windows closest to it, nearest first, then waits 20 s and gives up:
+    // `DoDamage( self.health + 10 )`, and the zombie dies.
     const FRAME_MS: u64 = 50;
     const RETRY_WAIT: f32 = 2.0;
     const GIVE_UP: f32 = 20.0;
@@ -298,7 +301,12 @@ fn a_zombie_with_no_way_to_any_window_walks_its_entrances_then_the_closest_then_
     let mut ms = 0;
     while ended_ms.is_none() && ms < 60_000 {
         threads.run(ms, &mut level);
-        let motor = &mut level.zombies.get_mut(&actor).unwrap().motor;
+        apply_zombie_damage(&mut level, &mut threads);
+        let Some(zombie) = level.zombies.get_mut(&actor) else {
+            ended_ms = Some(ms);
+            break;
+        };
+        let motor = &mut zombie.motor;
         if let Some(goal) = motor.goal_pos()
             && goals.last() != Some(&goal)
         {
@@ -308,9 +316,6 @@ fn a_zombie_with_no_way_to_any_window_walks_its_entrances_then_the_closest_then_
             if event == MotorEvent::BadPath {
                 threads.notify(actor_owner(actor), actor::BAD_PATH, Vec::new());
             }
-        }
-        if threads.thread_count() == 0 {
-            ended_ms = Some(ms);
         }
         ms += FRAME_MS;
     }
@@ -322,11 +327,17 @@ fn a_zombie_with_no_way_to_any_window_walks_its_entrances_then_the_closest_then_
     assert_eq!(goals, expected);
     // Every `SetGoalPos` waits for its `bad_path`, at most one repeat away.
     let tries = 2 + windows.len();
-    let ended = ended_ms.expect("it gives up") as f32 / 1000.0;
+    let ended = ended_ms.expect("it gives up and dies") as f32 / 1000.0;
     let earliest = RETRY_WAIT + GIVE_UP;
     let latest = earliest + (tries + 1) as f32 * ACTOR_BAD_PATH_REPEAT;
     assert!(
         (earliest..=latest).contains(&ended),
         "gave up at {ended} s, expected {earliest}..={latest}"
     );
+    // `zombie_death_event` counts it as timed out: nobody killed it, and it
+    // still ignored everyone. No kill points.
+    threads.run(ms, &mut level);
+    assert_eq!(level.zombies_timeout_spawn, 1);
+    assert_eq!(level.total_zombies_killed, 1);
+    assert!(level.scores.is_empty());
 }
